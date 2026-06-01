@@ -1,0 +1,3 @@
+# HEADLESS build of OpenCV - no GUI libs, much smaller. boto3 is already in the runtime.
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
