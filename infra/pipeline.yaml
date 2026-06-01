@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: EcoLens Part B - Pipeline. Starts with the upload-url function; grows to add the orchestrator + thumbnail later.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 15
+    MemorySize: 128
+    Environment:
+      Variables:
+        ORIGINALS_BUCKET: !Sub "ecolens-originals-${AWS::AccountId}"
+        HASHES_TABLE: EcoLensHashes
+
+Resources:
+
+  GetUploadUrlFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ecolens-get-upload-url
+      CodeUri: ../services/pipeline/get_upload_url/
+      Handler: app.lambda_handler
+      # Least-privilege: this function can ONLY put objects in originals,
+      # and read/write its own dedup table. Nothing else. (rubric 1.3)
+      Policies:
+        - Statement:
+            - Sid: WriteOriginalsBucket
+              Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "arn:aws:s3:::ecolens-originals-${AWS::AccountId}/*"
+            - Sid: DedupTableAccess
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/EcoLensHashes"
+      Events:
+        Presign:
+          Type: Api
+          Properties:
+            Path: /uploads/presign
+            Method: post
+
+Outputs:
+  ApiBaseUrl:
+    Description: Base URL of the upload API (give this to Member A).
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+  PresignEndpoint:
+    Description: The endpoint to POST to for an upload URL.
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/uploads/presign"
