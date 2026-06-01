@@ -88,7 +88,7 @@ Resources:
       FunctionName: ecolens-thumbnail
       PackageType: Image
       Timeout: 60
-      MemorySize: 1024
+      MemorySize: 2048   # more memory = more CPU = faster cold-start (avoids the init timeout)
       Environment:
         Variables:
           THUMBNAILS_BUCKET: !Sub "ecolens-thumbnails-${AWS::AccountId}"
