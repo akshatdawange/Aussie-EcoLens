@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: EcoLens Part B - hello test (proves the deploy toolchain works end-to-end)
+
+Resources:
+  HelloFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ecolens-hello-b
+      Runtime: python3.12
+      Handler: app.lambda_handler
+      CodeUri: ../services/pipeline/hello/
+      Timeout: 10
+      MemorySize: 128
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: get
+
+Outputs:
+  HelloUrl:
+    Description: Open this URL in your browser - you should see the hello message.
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello"
