@@ -41,6 +41,40 @@ Resources:
             Path: /uploads/presign
             Method: post
 
+  # Auto-triggered when a file lands in 'originals'. Calls C's AI (or mock) and saves to D's table.
+  OrchestratorFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ecolens-orchestrator
+      CodeUri: ../services/pipeline/orchestrator/
+      Handler: app.lambda_handler
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          MAIN_TABLE: EcoLensMain
+          THUMBNAILS_BUCKET: !Sub "ecolens-thumbnails-${AWS::AccountId}"
+      Policies:
+        - Statement:
+            - Sid: ReadOriginalsBucket
+              Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "arn:aws:s3:::ecolens-originals-${AWS::AccountId}/*"
+            - Sid: WriteMainTable
+              Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/EcoLensMain"
+            - Sid: ReadGcpConfigFromSsm
+              Effect: Allow
+              Action: ssm:GetParameter
+              Resource:
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/inferUrl"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/sharedSecret"
+            - Sid: DecryptSecureString
+              Effect: Allow
+              Action: kms:Decrypt
+              Resource: "*"
+
 Outputs:
   ApiBaseUrl:
     Description: Base URL of the upload API (give this to Member A).
