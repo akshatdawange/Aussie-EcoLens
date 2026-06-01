@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: EcoLens data stack - DynamoDB main table for media metadata and search indexes
+
+Resources:
+  EcoLensMainTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: EcoLensMain
+      BillingMode: PAY_PER_REQUEST
+
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+        - AttributeName: GSI3PK
+          AttributeType: S
+        - AttributeName: GSI3SK
+          AttributeType: S
+        - AttributeName: GSI4PK
+          AttributeType: S
+        - AttributeName: GSI4SK
+          AttributeType: S
+
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+        - IndexName: GSI2
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+        - IndexName: GSI3
+          KeySchema:
+            - AttributeName: GSI3PK
+              KeyType: HASH
+            - AttributeName: GSI3SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+        - IndexName: GSI4
+          KeySchema:
+            - AttributeName: GSI4PK
+              KeyType: HASH
+            - AttributeName: GSI4SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+      Tags:
+        - Key: Project
+          Value: EcoLens
+        - Key: Owner
+          Value: MemberD
+        - Key: Purpose
+          Value: MediaMetadataSearch
+
+  EcoLensMainTableNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /ecolens/tables/main
+      Type: String
+      Value: !Ref EcoLensMainTable
+      Description: DynamoDB main table name for EcoLens media metadata
+
+Outputs:
+  EcoLensMainTableName:
+    Description: Name of the EcoLens main DynamoDB table
+    Value: !Ref EcoLensMainTable
+
+  EcoLensMainTableArn:
+    Description: ARN of the EcoLens main DynamoDB table
+    Value: !GetAtt EcoLensMainTable.Arn
+
+  EcoLensMainTableParameter:
+    Description: SSM parameter storing the EcoLens main table name
+    Value: /ecolens/tables/main
