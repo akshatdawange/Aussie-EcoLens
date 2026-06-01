@@ -1,0 +1,37 @@
+# ===== Secrets / credentials — NEVER commit these =====
+.env
+.env.*
+*.pem
+*.key
+**/credentials
+aws-credentials*
+secrets.json
+
+# ===== Local-only notes (contain account ID) =====
+PART-B-CHECKLIST.md
+
+# ===== SAM / build artifacts =====
+.aws-sam/
+packaged.yaml
+*.zip
+
+# ===== Python (Lambda code) =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# ===== Node (Member A frontend) =====
+node_modules/
+dist/
+.vite/
+*.local
+
+# ===== OS / editor junk =====
+.DS_Store
+Thumbs.db
+*.swp
+*~
