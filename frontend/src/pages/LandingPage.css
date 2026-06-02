@@ -1,0 +1,182 @@
+.landing {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.landing__orb {
+  position: fixed;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(0,212,170,0.12) 0%,
+    rgba(0,212,170,0.04) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  transition: transform 0.6s var(--ease-out);
+  z-index: 0;
+}
+
+.landing__hero {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 24px 80px;
+  text-align: center;
+}
+
+.landing__hero-inner {
+  max-width: 780px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.landing__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,212,170,0.2);
+  border-radius: 100px;
+  padding: 6px 16px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.landing__badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-glow 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.landing__title {
+  font-family: var(--font-display);
+  font-size: clamp(42px, 7vw, 80px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.landing__title-accent {
+  display: block;
+  color: var(--accent);
+}
+
+.landing__title-serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.05em;
+}
+
+.landing__subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  max-width: 520px;
+  line-height: 1.7;
+}
+
+.landing__cta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Floating species tags */
+.landing__tags {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.landing__tag {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border: 1px solid var(--border-dim);
+  border-radius: 100px;
+  padding: 4px 12px;
+  animation: floatTag 8s ease-in-out infinite alternate;
+  opacity: 0.5;
+}
+
+.landing__tag:nth-child(1) { top: 18%; left: 8%;  animation-delay: 0s;   }
+.landing__tag:nth-child(2) { top: 35%; left: 4%;  animation-delay: 0.5s; }
+.landing__tag:nth-child(3) { top: 55%; left: 10%; animation-delay: 1s;   }
+.landing__tag:nth-child(4) { top: 72%; left: 6%;  animation-delay: 1.5s; }
+.landing__tag:nth-child(5) { top: 18%; right: 8%; animation-delay: 2s;   }
+.landing__tag:nth-child(6) { top: 35%; right: 4%; animation-delay: 2.5s; }
+.landing__tag:nth-child(7) { top: 55%; right: 9%; animation-delay: 3s;   }
+.landing__tag:nth-child(8) { top: 72%; right: 5%; animation-delay: 3.5s; }
+
+@keyframes floatTag {
+  from { transform: translateY(0px);   opacity: 0.3; }
+  to   { transform: translateY(-12px); opacity: 0.6; }
+}
+
+/* Feature section */
+.landing__features {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1px;
+  background: var(--border-dim);
+  border-top: 1px solid var(--border-dim);
+}
+
+.landing__feature-card {
+  background: var(--bg-void);
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: background 0.3s;
+}
+.landing__feature-card:hover { background: var(--bg-deep); }
+
+.landing__feature-icon {
+  font-size: 28px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.landing__feature-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.landing__feature-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
