@@ -1,6 +1,19 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: EcoLens API stack - API Gateway and Lambda functions
+Parameters:
+  CognitoUserPoolId:
+    Type: String
+    Description: Cognito User Pool ID for API Gateway JWT authorisation
+
+  CognitoAppClientId:
+    Type: String
+    Description: Cognito App Client ID for API Gateway JWT authorisation
+
+  CognitoRegion:
+    Type: String
+    Default: ap-southeast-2
+    Description: AWS region where Cognito User Pool is deployed
 
 Globals:
   Function:
@@ -21,6 +34,17 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: prod
+
+      Auth:
+        DefaultAuthorizer: CognitoJwtAuthorizer
+        Authorizers:
+          CognitoJwtAuthorizer:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${CognitoRegion}.amazonaws.com/${CognitoUserPoolId}"
+              audience:
+                - !Ref CognitoAppClientId
+
       CorsConfiguration:
         AllowOrigins:
           - "*"
