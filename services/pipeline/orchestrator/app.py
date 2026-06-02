@@ -33,7 +33,8 @@ THUMBNAILS_BUCKET = os.environ["THUMBNAILS_BUCKET"]
 REGION = os.environ.get("AWS_REGION", "ap-southeast-2")
 INFER_URL_PARAM = os.environ.get("GCP_INFER_URL_PARAM", "/ecolens/gcp/inferUrl")
 SECRET_PARAM = os.environ.get("GCP_SECRET_PARAM", "/ecolens/gcp/sharedSecret")
-THUMBNAIL_FN = os.environ.get("THUMBNAIL_FN", "")  # we fan out to this on each upload
+THUMBNAIL_FN = os.environ.get("THUMBNAIL_FN", "")  # image thumbnail fan-out
+FRAME_FN = os.environ.get("FRAME_FN", "")          # video frame-extract fan-out
 
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 MOCK_COUNTS = {"koala": 2, "wombat": 1}   # used only until Member C's AI is wired
@@ -140,16 +141,18 @@ def process(bucket, key):
 def lambda_handler(event, context):
     # S3 allows only ONE trigger per event type, so we fan out: kick off the thumbnail
     # function in parallel, passing it the same S3 event.
-    if THUMBNAIL_FN:
+    for fn in (THUMBNAIL_FN, FRAME_FN):
+        if not fn:
+            continue
         try:
             lambda_client.invoke(
-                FunctionName=THUMBNAIL_FN,
+                FunctionName=fn,
                 InvocationType="Event",  # async - don't wait for it
                 Payload=json.dumps(event).encode("utf-8"),
             )
-            print(f"Fanned out to thumbnail function: {THUMBNAIL_FN}")
+            print(f"Fanned out to: {fn}")
         except Exception as exc:
-            print(f"Could not invoke thumbnail function: {exc}")
+            print(f"Could not invoke {fn}: {exc}")
 
     for record in event.get("Records", []):
         bucket = record["s3"]["bucket"]["name"]

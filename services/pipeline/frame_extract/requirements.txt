@@ -1,0 +1,2 @@
+# imageio-ffmpeg bundles a static Linux ffmpeg binary - no external download needed.
+imageio-ffmpeg==0.5.1

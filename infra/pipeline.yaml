@@ -56,6 +56,7 @@ Resources:
           MAIN_TABLE: EcoLensMain
           THUMBNAILS_BUCKET: !Sub "ecolens-thumbnails-${AWS::AccountId}"
           THUMBNAIL_FN: ecolens-thumbnail
+          FRAME_FN: ecolens-frame-extract
       Policies:
         - Statement:
             - Sid: ReadOriginalsBucket
@@ -76,10 +77,12 @@ Resources:
               Effect: Allow
               Action: kms:Decrypt
               Resource: "*"
-            - Sid: InvokeThumbnailFn
+            - Sid: InvokeFanoutFns
               Effect: Allow
               Action: lambda:InvokeFunction
-              Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:ecolens-thumbnail"
+              Resource:
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:ecolens-thumbnail"
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:ecolens-frame-extract"
 
   # Auto-triggered when an IMAGE lands in 'originals'. Container image (needs OpenCV).
   ThumbnailFn:
@@ -105,6 +108,49 @@ Resources:
     Metadata:
       Dockerfile: Dockerfile
       DockerContext: ../services/pipeline/thumbnail/
+      DockerTag: v1
+
+  # Auto-handles VIDEO uploads: ffmpeg 1 frame/sec -> infer each (in parallel) -> DB. Container image.
+  FrameExtractFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ecolens-frame-extract
+      PackageType: Image
+      Timeout: 600
+      MemorySize: 2048
+      EphemeralStorage:
+        Size: 2048
+      Environment:
+        Variables:
+          FRAMES_BUCKET: !Sub "ecolens-frames-${AWS::AccountId}"
+          MAIN_TABLE: EcoLensMain
+      Policies:
+        - Statement:
+            - Sid: ReadOriginalsBucket
+              Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "arn:aws:s3:::ecolens-originals-${AWS::AccountId}/*"
+            - Sid: WriteFramesBucket
+              Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "arn:aws:s3:::ecolens-frames-${AWS::AccountId}/*"
+            - Sid: WriteMainTable
+              Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/EcoLensMain"
+            - Sid: ReadGcpConfigFromSsm
+              Effect: Allow
+              Action: ssm:GetParameter
+              Resource:
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/inferUrl"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/sharedSecret"
+            - Sid: DecryptSecureString
+              Effect: Allow
+              Action: kms:Decrypt
+              Resource: "*"
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ../services/pipeline/frame_extract/
       DockerTag: v1
 
 Outputs:
