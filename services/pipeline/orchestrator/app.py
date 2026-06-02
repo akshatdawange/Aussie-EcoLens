@@ -69,12 +69,14 @@ def detect_species(bucket, key):
         infer_url = infer_url.rstrip("/") + "/infer"
 
     secret = _ssm_get(SECRET_PARAM, decrypt=True) or ""
-    image_bytes = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    image_bytes = obj["Body"].read()
+    content_type = obj.get("ContentType") or "image/jpeg"   # C expects image/jpeg
     req = urllib.request.Request(
         infer_url,
         data=image_bytes,
         method="POST",
-        headers={"Content-Type": "application/octet-stream", "X-EcoLens-Secret": secret},
+        headers={"Content-Type": content_type, "X-EcoLens-Secret": secret},
     )
     try:
         # Short timeout: if C's endpoint is slow/unreachable, fail fast and fall back to mock
