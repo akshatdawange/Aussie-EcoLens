@@ -142,7 +142,7 @@ Resources:
             Path: /tags/bulk
             Method: POST
 
-    DeleteFilesFunction:
+  DeleteFilesFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: EcoLensDeleteFilesFunction
