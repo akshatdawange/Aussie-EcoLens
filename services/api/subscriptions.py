@@ -119,16 +119,30 @@ def create_or_update_subscription(event):
         subscription_arn = None
 
         if SNS_TOPIC_ARN:
-            sns_response = sns.subscribe(
-                TopicArn=SNS_TOPIC_ARN,
-                Protocol="email",
-                Endpoint=email,
-                ReturnSubscriptionArn=True,
-                Attributes={
-                    "FilterPolicy": build_filter_policy(cleaned_species)
-                }
-            )
-            subscription_arn = sns_response.get("SubscriptionArn")
+            filter_policy = build_filter_policy(cleaned_species)
+
+            existing_subscription_arn = find_existing_email_subscription(email)
+
+            if existing_subscription_arn:
+                subscription_arn = existing_subscription_arn
+
+                if subscription_arn != "PendingConfirmation":
+                    sns.set_subscription_attributes(
+                        SubscriptionArn=subscription_arn,
+                        AttributeName="FilterPolicy",
+                        AttributeValue=filter_policy
+                    )
+            else:
+                sns_response = sns.subscribe(
+                    TopicArn=SNS_TOPIC_ARN,
+                    Protocol="email",
+                    Endpoint=email,
+                    ReturnSubscriptionArn=True,
+                    Attributes={
+                        "FilterPolicy": filter_policy
+                    }
+                )
+                subscription_arn = sns_response.get("SubscriptionArn")
 
         table.put_item(
             Item={
@@ -201,3 +215,38 @@ def build_filter_policy(species):
     """
     species_values = ", ".join([f'"{item}"' for item in species])
     return f'{{"species": [{species_values}]}}'
+
+def find_existing_email_subscription(email):
+    """
+    Returns the existing SNS subscription ARN for this email if it is already
+    subscribed to the topic. Returns None if not found.
+    """
+
+    if not SNS_TOPIC_ARN:
+        return None
+
+    next_token = None
+
+    while True:
+        kwargs = {
+            "TopicArn": SNS_TOPIC_ARN
+        }
+
+        if next_token:
+            kwargs["NextToken"] = next_token
+
+        response = sns.list_subscriptions_by_topic(**kwargs)
+
+        for subscription in response.get("Subscriptions", []):
+            if (
+                subscription.get("Protocol") == "email"
+                and subscription.get("Endpoint") == email
+            ):
+                return subscription.get("SubscriptionArn")
+
+        next_token = response.get("NextToken")
+
+        if not next_token:
+            break
+
+    return None

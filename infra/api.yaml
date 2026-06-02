@@ -212,6 +212,7 @@ Resources:
               - sns:Unsubscribe
               - sns:GetSubscriptionAttributes
               - sns:SetSubscriptionAttributes
+              - sns:ListSubscriptionsByTopic
             Resource:
               - !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:EcoLensTagsTopic
       Events:
