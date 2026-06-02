@@ -80,8 +80,6 @@ Resources:
       Tags:
         - Key: Project
           Value: EcoLens
-        - Key: Owner
-          Value: MemberD
         - Key: Purpose
           Value: MediaMetadataSearch
 
