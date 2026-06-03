@@ -14,6 +14,26 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "ecolens-thumbnails-${AWS::AccountId}"
+      # Allow a public-read bucket policy (thumbnails are low-res previews shown in the UI).
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+
+  # Public read-only access to thumbnails so the browser can load them via <img src>.
+  ThumbnailsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ThumbnailsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadThumbnails
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "arn:aws:s3:::ecolens-thumbnails-${AWS::AccountId}/*"
 
   FramesBucket:
     Type: AWS::S3::Bucket

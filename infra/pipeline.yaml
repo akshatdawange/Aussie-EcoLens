@@ -60,6 +60,30 @@ Resources:
             Path: /uploads/presign
             Method: post
 
+  # Returns a short-lived presigned URL for a full-size original (click-to-enlarge). Cognito-protected.
+  GetMediaUrlFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ecolens-get-media-url
+      Runtime: python3.12
+      CodeUri: ../services/pipeline/get_media_url/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          MEDIA_URL_TTL: "300"
+      Policies:
+        - Statement:
+            - Sid: ReadOriginalsForPresign
+              Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "arn:aws:s3:::ecolens-originals-${AWS::AccountId}/*"
+      Events:
+        MediaUrl:
+          Type: Api
+          Properties:
+            Path: /media-url
+            Method: get
+
   # Auto-triggered when a file lands in 'originals'. Calls C's AI (or mock) and saves to D's table.
   OrchestratorFn:
     Type: AWS::Serverless::Function
