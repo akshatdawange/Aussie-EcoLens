@@ -28,6 +28,7 @@ import imageio_ffmpeg
 s3 = boto3.client("s3")
 ssm = boto3.client("ssm")
 ddb = boto3.resource("dynamodb")
+sns = boto3.client("sns")
 
 FRAMES_BUCKET = os.environ["FRAMES_BUCKET"]
 ORIGINALS_BUCKET = os.environ["ORIGINALS_BUCKET"]
@@ -35,6 +36,7 @@ MAIN_TABLE = os.environ["MAIN_TABLE"]
 REGION = os.environ.get("AWS_REGION", "ap-southeast-2")
 INFER_URL_PARAM = os.environ.get("GCP_INFER_URL_PARAM", "/ecolens/gcp/inferUrl")
 SECRET_PARAM = os.environ.get("GCP_SECRET_PARAM", "/ecolens/gcp/sharedSecret")
+TAGS_TOPIC_PARAM = os.environ.get("TAGS_TOPIC_PARAM", "/ecolens/sns/tagsTopicArn")
 MAX_INFER_FRAMES = int(os.environ.get("MAX_INFER_FRAMES", "90"))   # bound very long videos
 PARALLELISM = int(os.environ.get("INFER_PARALLELISM", "8"))         # concurrent calls to C
 
@@ -89,6 +91,30 @@ def s3_url(bucket, key):
     return f"https://{bucket}.s3.{REGION}.amazonaws.com/{urllib.parse.quote(key)}"
 
 
+def publish_tags(counts, file_id):
+    """Notify subscribers via SNS. The 'species' String.Array attribute lets D's
+    subscription filter policies deliver only the species each user follows."""
+    if not counts:
+        return
+    topic_arn = _ssm_get(TAGS_TOPIC_PARAM)
+    if not topic_arn:
+        print("No SNS topic ARN in SSM; skipping notification.")
+        return
+    species = sorted(counts.keys())   # already normalised (lowercase + trimmed)
+    try:
+        sns.publish(
+            TopicArn=topic_arn,
+            Subject="EcoLens: new wildlife detected (video)",
+            Message=f"New video tagged with: {', '.join(species)} (fileId {file_id}).",
+            MessageAttributes={
+                "species": {"DataType": "String.Array", "StringValue": json.dumps(species)}
+            },
+        )
+        print(f"Published SNS notification for species: {species}")
+    except Exception as exc:
+        print(f"SNS publish failed: {exc}")
+
+
 def process(bucket, key):
     if not key.lower().endswith(VIDEO_EXTS):
         print(f"Not a video, skipping: {key}")
@@ -126,10 +152,13 @@ def process(bucket, key):
     with ThreadPoolExecutor(max_workers=PARALLELISM) as pool:
         for counts in pool.map(_infer_path, to_infer):
             for species, count in counts.items():
-                aggregated[species] = max(aggregated.get(species, 0), int(count))
+                sp = (species or "").strip().lower()   # normalise to match D's filters
+                if sp:
+                    aggregated[sp] = max(aggregated.get(sp, 0), int(count))
 
     print(f"Aggregated video tags from {len(to_infer)} frames: {aggregated}")
     write_records(file_id, owner_sub, key, filename, aggregated, poster_url)
+    publish_tags(aggregated, file_id)
 
 
 def write_records(file_id, owner_sub, key, filename, counts, poster_url):

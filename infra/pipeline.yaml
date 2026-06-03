@@ -2,6 +2,13 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: EcoLens Part B - Pipeline. Starts with the upload-url function; grows to add the orchestrator + thumbnail later.
 
+Parameters:
+  CognitoUserPoolId:
+    # Resolved from SSM at deploy time - the template stores only the path, not the ID.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /ecolens/cognito/userPoolId
+    Description: Reads Member A's Cognito User Pool ID from SSM (no hardcoding).
+
 Globals:
   Function:
     Timeout: 15
@@ -10,6 +17,18 @@ Globals:
       Variables:
         ORIGINALS_BUCKET: !Sub "ecolens-originals-${AWS::AccountId}"
         HASHES_TABLE: EcoLensHashes
+  Api:
+    # Protect the upload endpoint with Member A's Cognito user pool.
+    Auth:
+      DefaultAuthorizer: CognitoAuth
+      AddDefaultAuthorizerToCorsPreflight: false   # keep OPTIONS preflight open for the browser
+      Authorizers:
+        CognitoAuth:
+          UserPoolArn: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}"
+    Cors:
+      AllowOrigin: "'*'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowMethods: "'POST,OPTIONS'"
 
 Resources:
 
@@ -73,10 +92,15 @@ Resources:
               Resource:
                 - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/inferUrl"
                 - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/sharedSecret"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/sns/tagsTopicArn"
             - Sid: DecryptSecureString
               Effect: Allow
               Action: kms:Decrypt
               Resource: "*"
+            - Sid: PublishTagsTopic
+              Effect: Allow
+              Action: sns:Publish
+              Resource: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:EcoLensTagsTopic"
             - Sid: InvokeFanoutFns
               Effect: Allow
               Action: lambda:InvokeFunction
@@ -144,10 +168,15 @@ Resources:
               Resource:
                 - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/inferUrl"
                 - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/sharedSecret"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/sns/tagsTopicArn"
             - Sid: DecryptSecureString
               Effect: Allow
               Action: kms:Decrypt
               Resource: "*"
+            - Sid: PublishTagsTopic
+              Effect: Allow
+              Action: sns:Publish
+              Resource: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:EcoLensTagsTopic"
     Metadata:
       Dockerfile: Dockerfile
       DockerContext: ../services/pipeline/frame_extract/

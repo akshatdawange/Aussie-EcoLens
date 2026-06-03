@@ -26,6 +26,7 @@ s3 = boto3.client("s3")
 ssm = boto3.client("ssm")
 ddb = boto3.resource("dynamodb")
 lambda_client = boto3.client("lambda")
+sns = boto3.client("sns")
 
 MAIN_TABLE = os.environ["MAIN_TABLE"]
 ORIGINALS_BUCKET = os.environ["ORIGINALS_BUCKET"]
@@ -35,6 +36,7 @@ INFER_URL_PARAM = os.environ.get("GCP_INFER_URL_PARAM", "/ecolens/gcp/inferUrl")
 SECRET_PARAM = os.environ.get("GCP_SECRET_PARAM", "/ecolens/gcp/sharedSecret")
 THUMBNAIL_FN = os.environ.get("THUMBNAIL_FN", "")  # image thumbnail fan-out
 FRAME_FN = os.environ.get("FRAME_FN", "")          # video frame-extract fan-out
+TAGS_TOPIC_PARAM = os.environ.get("TAGS_TOPIC_PARAM", "/ecolens/sns/tagsTopicArn")
 
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 MOCK_COUNTS = {"koala": 2, "wombat": 1}   # used only until Member C's AI is wired
@@ -96,6 +98,30 @@ def s3_url(bucket, key):
     return f"https://{bucket}.s3.{REGION}.amazonaws.com/{urllib.parse.quote(key)}"
 
 
+def publish_tags(counts, file_id):
+    """Notify subscribers via SNS. The 'species' String.Array attribute lets D's
+    subscription filter policies deliver only the species each user follows."""
+    if not counts:
+        return
+    topic_arn = _ssm_get(TAGS_TOPIC_PARAM)
+    if not topic_arn:
+        print("No SNS topic ARN in SSM; skipping notification.")
+        return
+    species = sorted(counts.keys())   # already normalised (lowercase + trimmed)
+    try:
+        sns.publish(
+            TopicArn=topic_arn,
+            Subject="EcoLens: new wildlife detected",
+            Message=f"New media tagged with: {', '.join(species)} (fileId {file_id}).",
+            MessageAttributes={
+                "species": {"DataType": "String.Array", "StringValue": json.dumps(species)}
+            },
+        )
+        print(f"Published SNS notification for species: {species}")
+    except Exception as exc:
+        print(f"SNS publish failed: {exc}")
+
+
 def process(bucket, key):
     if not key.lower().endswith(IMAGE_EXTS):
         print(f"Not an image, skipping (videos handled later): {key}")
@@ -107,6 +133,8 @@ def process(bucket, key):
     filename = parts[-1]
 
     counts = detect_species(bucket, key)
+    # Normalise species labels (lowercase + trim) so they match D's subscription filters.
+    counts = {k.strip().lower(): int(v) for k, v in counts.items() if k and k.strip()}
     created = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     original_url = s3_url(ORIGINALS_BUCKET, key)
     thumb_key = key.rsplit(".", 1)[0] + "_thumb.jpg"
@@ -136,6 +164,7 @@ def process(bucket, key):
         })
 
     print(f"Wrote META + {len(counts)} SPECIES rows for file {file_id}: {counts}")
+    publish_tags(counts, file_id)
 
 
 def lambda_handler(event, context):
