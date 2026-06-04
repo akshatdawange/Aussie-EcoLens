@@ -26,10 +26,10 @@ const LoadingScreen = () => (
 );
 
 const ProtectedRoute = ({ children }) => {
-  const auth = useAuth();
-  if (auth.isLoading) return <LoadingScreen />;
-  if (auth.error || !auth.isAuthenticated) return <Navigate to="/signin" replace />;
+  const token = sessionStorage.getItem('idToken');
+  if (!token) return <Navigate to="/" replace />;
   return children;
 };
+
 
 export default ProtectedRoute;

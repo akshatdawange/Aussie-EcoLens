@@ -18,12 +18,12 @@ const App = () => {
       <Navbar />
       <Routes>
         <Route path="/"       element={<LandingPage />} />
-        <Route path="/signin" element={auth.isAuthenticated ? <Navigate to="/upload" replace /> : <SignInPage />} />
-        <Route path="/signup" element={auth.isAuthenticated ? <Navigate to="/upload" replace /> : <SignUpPage />} />
+        <Route path="/signin" element={<Navigate to="/" replace />} />
+        <Route path="/signup" element={<Navigate to="/" replace />} />
         <Route path="/upload" element={<ProtectedRoute><UploadPage /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
         <Route path="/files"  element={<ProtectedRoute><MyFilesPage /></ProtectedRoute>} />
-        <Route path="*"       element={<NotFoundPage />} />
+        <Route path="/NotFoundPage"       element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

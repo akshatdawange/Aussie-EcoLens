@@ -1,63 +1,138 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from 'react-oidc-context';
 import Button from '../components/Button';
+import InputField from '../components/InputField';
 import './AuthPages.css';
 
 const SignUpPage = () => {
-  const auth = useAuth();
   const navigate = useNavigate();
+  const [form, setForm] = useState({
+    firstName: '', lastName: '', email: '', password: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  // Cognito Hosted UI handles sign-up too — redirect to signinRedirect
-  // which includes a link to sign up on the hosted UI
-  const handleSignUp = () => {
-    auth.signinRedirect({
-      extraQueryParams: { screen_hint: 'signup' },
-    });
+  const update = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const { CognitoIdentityProviderClient, SignUpCommand } = await import('@aws-sdk/client-cognito-identity-provider');
+
+      const client = new CognitoIdentityProviderClient({
+        region: 'ap-southeast-2'
+      });
+
+      await client.send(new SignUpCommand({
+        ClientId: process.env.REACT_APP_COGNITO_CLIENT_ID,
+        Username: form.email,
+        Password: form.password,
+        UserAttributes: [
+          { Name: 'email',       Value: form.email },
+          { Name: 'given_name',  Value: form.firstName },
+          { Name: 'family_name', Value: form.lastName },
+        ],
+      }));
+
+      setSuccess(true);
+    } catch (err) {
+      setError(err.message || 'Sign up failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (success) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card animate-fade-up">
+          <button className="auth-logo" onClick={() => navigate('/')}>
+            AussieEcoLens
+          </button>
+          <div className="auth-card__header">
+            <h1 className="auth-card__title">Check your email</h1>
+            <p className="auth-card__subtitle">
+              We sent a verification link to <strong>{form.email}</strong>.
+              Verify your email then sign in.
+            </p>
+          </div>
+          <div className="auth-card__body">
+            <Button variant="primary" size="lg" fullWidth onClick={() => navigate('/signin')}>
+              Go to sign in
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">
       <div className="auth-card animate-fade-up">
+        <button className="auth-logo" onClick={() => navigate('/')}>
+          AussieEcoLens
+        </button>
+
         <div className="auth-card__header">
-          <button className="auth-logo" onClick={() => navigate('/')}>
-            <span className="auth-logo__icon">◈</span>
-            <span>Aussie<span style={{color:'var(--accent)'}}>EcoLens</span></span>
-          </button>
-          <h1 className="auth-card__title">Join EcoLens</h1>
+          <h1 className="auth-card__title">Create account</h1>
           <p className="auth-card__subtitle">
-            Create your free account and start contributing to Australian wildlife research.
+            Join the Australian wildlife research community.
           </p>
         </div>
 
-        <div className="auth-card__body">
-          {/* What to expect */}
-          <ul className="auth-perks">
-            {[
-              'Automatic species detection on upload',
-              'Search across your entire media library',
-              'Email alerts for new sightings',
-              'Secure cloud storage across AWS + GCP',
-            ].map(perk => (
-              <li key={perk} className="auth-perk">
-                <span className="auth-perk__check">✓</span>
-                {perk}
-              </li>
-            ))}
-          </ul>
+        <form className="auth-card__body" onSubmit={handleSignUp}>
+          <div className="auth-name-row">
+            <InputField
+              label="First name"
+              placeholder="Mark"
+              value={form.firstName}
+              onChange={update('firstName')}
+              required
+            />
+            <InputField
+              label="Last name"
+              placeholder="Brown"
+              value={form.lastName}
+              onChange={update('lastName')}
+              required
+            />
+          </div>
+
+          <InputField
+            label="Email"
+            type="email"
+            placeholder="you@example.com"
+            value={form.email}
+            onChange={update('email')}
+            required
+          />
+
+          <InputField
+            label="Password"
+            type="password"
+            placeholder="Min 8 characters"
+            value={form.password}
+            onChange={update('password')}
+            required
+          />
+
+          {error && <p className="auth-error">{error}</p>}
 
           <Button
+            type="submit"
             variant="primary"
             size="lg"
             fullWidth
-            onClick={handleSignUp}
+            loading={loading}
           >
-            Create account →
+            Create account
           </Button>
 
-          <div className="auth-divider">
-            <span>Already have an account?</span>
-          </div>
+          <div className="auth-divider"><span>or</span></div>
 
           <Button
             variant="ghost"
@@ -67,35 +142,9 @@ const SignUpPage = () => {
           >
             Sign in instead
           </Button>
-        </div>
+        </form>
 
-        <p className="auth-card__note">
-          By creating an account, you agree that observation data may be used for
-          environmental research purposes.
-        </p>
-      </div>
-
-      {/* Decorative panel */}
-      <div className="auth-panel">
-        <div className="auth-panel__content">
-          <blockquote className="auth-panel__quote">
-            <span className="auth-panel__quote-mark">"</span>
-            Citizen science is reshaping how we understand ecosystems.
-            Your photos matter.
-          </blockquote>
-          <div className="auth-panel__stat-grid">
-            {[
-              { n: 'Free',   label: 'Forever' },
-              { n: 'Auto',   label: 'AI tagging' },
-              { n: 'Secure', label: 'Cognito auth' },
-            ].map(s => (
-              <div key={s.label} className="auth-panel__stat">
-                <span className="auth-panel__stat-n">{s.n}</span>
-                <span className="auth-panel__stat-label">{s.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <p className="auth-card__note">Secured by AWS Cognito</p>
       </div>
     </div>
   );

@@ -41,7 +41,6 @@ const Navbar = () => {
 
         {/* Logo */}
         <button className="navbar__logo" onClick={() => navigate('/')}>
-          <span className="navbar__logo-icon">◈</span>
           <span className="navbar__logo-text">
             Aussie<span className="navbar__logo-accent">EcoLens</span>
           </span>
@@ -62,26 +61,21 @@ const Navbar = () => {
           </div>
         )}
 
-        {/* Right side */}
-        <div className="navbar__actions">
-          {auth.isAuthenticated ? (
-            <>
-              <div className="navbar__user">
-                <span className="navbar__user-avatar">
-                  {firstName.charAt(0).toUpperCase()}
-                </span>
-                <span className="navbar__user-name">{firstName}</span>
-              </div>
-              <button className="navbar__signout" onClick={handleSignOut}>
-                Sign out
-              </button>
-            </>
-          ) : (
-            <button className="navbar__signin-btn" onClick={() => navigate('/signin')}>
-              Sign in
-            </button>
-          )}
-        </div>
+            <div className="navbar__actions">
+                {auth.isAuthenticated && (
+                    <>
+                    <div className="navbar__user">
+                        <span className="navbar__user-avatar">
+                         {firstName.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="navbar__user-name">{firstName}</span>
+                    </div>
+                    <button className="navbar__signout" onClick={handleSignOut}>
+                        Sign out
+                    </button>
+                </>
+                )}
+            </div>
 
         {/* Mobile hamburger */}
         <button

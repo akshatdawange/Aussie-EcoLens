@@ -9,16 +9,16 @@
   --border-dim:     rgba(255,255,255,0.06);
   --border-soft:    rgba(255,255,255,0.11);
   --border-bright:  rgba(255,255,255,0.22);
-  --accent:         #00d4aa;
-  --accent-dim:     rgba(0, 212, 170, 0.15);
-  --accent-glow:    rgba(0, 212, 170, 0.35);
-  --accent-deep:    #00a884;
+  --accent:         #c8a96e;
+  --accent-dim:     rgba(200, 169, 110, 0.12);
+  --accent-glow:    rgba(200, 169, 110, 0.3);
+  --accent-deep:    #a8894e;
+  --text-accent:    #c8a96e;
   --amber:          #f5a623;
   --amber-dim:      rgba(245,166,35,0.12);
   --text-primary:   #e8edf2;
   --text-secondary: #7d8fa3;
   --text-muted:     #4a5568;
-  --text-accent:    #00d4aa;
   --success:        #22c55e;
   --warning:        #f5a623;
   --error:          #ef4444;
@@ -53,8 +53,8 @@ body::after {
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+  linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
   z-index: 0;
@@ -101,3 +101,10 @@ ul, ol { list-style: none; }
 .stagger > *:nth-child(4) { animation-delay: 0.2s;  }
 .stagger > *:nth-child(5) { animation-delay: 0.25s; }
 .stagger > *:nth-child(6) { animation-delay: 0.3s;  }
+
+h1, h2, h3, h4, h5, h6,
+button, label, nav,
+.btn, .navbar, .auth-card,
+.auth-card * {
+  font-family: var(--font-display);
+}

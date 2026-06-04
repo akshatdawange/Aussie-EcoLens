@@ -1,84 +1,94 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'react-oidc-context';
 import Button from '../components/Button';
+import InputField from '../components/InputField';
 import './AuthPages.css';
 
 const SignInPage = () => {
-  const auth = useAuth();
   const navigate = useNavigate();
+  const auth = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignIn = () => {
-    auth.signinRedirect();
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await auth.signinResourceOwnerCredentials({
+        username: email,
+        password: password,
+      });
+      navigate('/upload');
+    } catch (err) {
+      setError('Invalid email or password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="auth-page">
       <div className="auth-card animate-fade-up">
-        {/* Header */}
+        <button className="auth-logo" onClick={() => navigate('/')}>
+          AussieEcoLens
+        </button>
+
         <div className="auth-card__header">
-          <button className="auth-logo" onClick={() => navigate('/')}>
-            <span className="auth-logo__icon">◈</span>
-            <span>Aussie<span style={{color:'var(--accent)'}}>EcoLens</span></span>
-          </button>
-          <h1 className="auth-card__title">Welcome back</h1>
+          <h1 className="auth-card__title">Sign in</h1>
           <p className="auth-card__subtitle">
-            Sign in to your account to continue cataloguing Australia's wildlife.
+            Continue to your wildlife observation dashboard.
           </p>
         </div>
 
-        {/* Sign in button — uses Cognito Hosted UI */}
-        <div className="auth-card__body">
+        <form className="auth-card__body" onSubmit={handleSignIn}>
+          <InputField
+            label="Email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+          />
+          <InputField
+            label="Password"
+            type="password"
+            placeholder="Your password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+          />
+
+          {error && (
+            <p className="auth-error">{error}</p>
+          )}
+
           <Button
+            type="submit"
             variant="primary"
             size="lg"
             fullWidth
-            onClick={handleSignIn}
+            loading={loading}
           >
-            Continue with Cognito →
+            Sign in
           </Button>
 
-          <div className="auth-divider">
-            <span>Don't have an account?</span>
-          </div>
+          <div className="auth-divider"><span>or</span></div>
 
           <Button
-            variant="secondary"
+            variant="ghost"
             size="lg"
             fullWidth
             onClick={() => navigate('/signup')}
           >
-            Create account
+            Create an account
           </Button>
-        </div>
+        </form>
 
-        {/* Footer note */}
-        <p className="auth-card__note">
-          Protected by AWS Cognito. Your credentials are never stored by this app.
-        </p>
-      </div>
-
-      {/* Decorative side panel */}
-      <div className="auth-panel">
-        <div className="auth-panel__content">
-          <blockquote className="auth-panel__quote">
-            <span className="auth-panel__quote-mark">"</span>
-            Australia holds 10% of the world's biodiversity.
-            Every observation counts.
-          </blockquote>
-          <div className="auth-panel__stat-grid">
-            {[
-              { n: '300+', label: 'Species tracked' },
-              { n: '2 clouds', label: 'Infrastructure' },
-              { n: '< 3s',  label: 'AI tagging time' },
-            ].map(s => (
-              <div key={s.label} className="auth-panel__stat">
-                <span className="auth-panel__stat-n">{s.n}</span>
-                <span className="auth-panel__stat-label">{s.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <p className="auth-card__note">Secured by AWS Cognito</p>
       </div>
     </div>
   );
