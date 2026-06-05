@@ -3,10 +3,8 @@ orchestrator  (Member B)  —  triggered automatically when a file lands in 'ori
 -------------------------------------------------------------------------------------
 For each uploaded IMAGE it:
   1. Works out owner + fileId from the S3 key  (sub/fileId/filename).
-  2. Gets the animal tags from Member C's AI:
-        - If /ecolens/gcp/inferUrl is set in SSM  -> call C's real /infer endpoint.
-        - If not set, or the call fails           -> fall back to MOCK tags (so we are
-                                                     never blocked while C finishes).
+  2. Gets the animal tags from Member C's AI (retries so a cold start can wake up;
+     if C never answers, records NO tags - never mock).
   3. Writes a META row + one SPECIES row per animal into Member D's EcoLensMain table,
      following the team contract (section 3a).
 
@@ -15,6 +13,7 @@ Videos are skipped here -> handled by the frame-extract function (Phase B6).
 
 import os
 import json
+import time
 import uuid
 import datetime
 import urllib.parse
@@ -39,7 +38,8 @@ FRAME_FN = os.environ.get("FRAME_FN", "")          # video frame-extract fan-out
 TAGS_TOPIC_PARAM = os.environ.get("TAGS_TOPIC_PARAM", "/ecolens/sns/tagsTopicArn")
 
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
-MOCK_COUNTS = {"koala": 2, "wombat": 1}   # used only until Member C's AI is wired
+INFER_ATTEMPTS = int(os.environ.get("INFER_ATTEMPTS", "3"))   # retry C (cold starts are slow)
+INFER_TIMEOUT = int(os.environ.get("INFER_TIMEOUT", "30"))    # seconds per attempt
 
 _cache = {}
 
@@ -61,11 +61,12 @@ def _ssm_get(name, decrypt=False):
 
 
 def detect_species(bucket, key):
-    """Call Member C's real AI if configured; otherwise return MOCK tags."""
+    """Call Member C's AI, retrying so a cold start has time to wake up.
+    NO mock fallback: if C never answers, we record NO tags (never fake ones)."""
     infer_url = _ssm_get(INFER_URL_PARAM)
     if not infer_url:
-        print("GCP inferUrl not set in SSM yet -> using MOCK tags.")
-        return MOCK_COUNTS
+        print("GCP inferUrl not set in SSM; recording no tags.")
+        return {}
 
     # C stores the base Cloud Run URL; make sure we hit the /infer path.
     if not infer_url.rstrip("/").endswith("/infer"):
@@ -74,24 +75,25 @@ def detect_species(bucket, key):
     secret = _ssm_get(SECRET_PARAM, decrypt=True) or ""
     obj = s3.get_object(Bucket=bucket, Key=key)
     image_bytes = obj["Body"].read()
-    content_type = obj.get("ContentType") or "image/jpeg"   # C expects image/jpeg
-    req = urllib.request.Request(
-        infer_url,
-        data=image_bytes,
-        method="POST",
-        headers={"Content-Type": content_type, "X-EcoLens-Secret": secret},
-    )
-    try:
-        # Short timeout: if C's endpoint is slow/unreachable, fail fast and fall back to mock
-        # (so our pipeline still completes). The Lambda timeout (60s) is the outer safety net.
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-        counts = payload.get("counts", {})
-        print(f"GCP AI returned: {counts}")
-        return counts
-    except Exception as exc:
-        print(f"GCP infer call failed ({exc}) -> falling back to MOCK tags.")
-        return MOCK_COUNTS
+    content_type = obj.get("ContentType") or "image/jpeg"
+
+    for attempt in range(1, INFER_ATTEMPTS + 1):
+        req = urllib.request.Request(
+            infer_url, data=image_bytes, method="POST",
+            headers={"Content-Type": content_type, "X-EcoLens-Secret": secret},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=INFER_TIMEOUT) as resp:
+                counts = json.loads(resp.read().decode("utf-8")).get("counts", {})
+            print(f"GCP AI returned (attempt {attempt}): {counts}")
+            return counts
+        except Exception as exc:
+            print(f"GCP infer attempt {attempt}/{INFER_ATTEMPTS} failed: {exc}")
+            if attempt < INFER_ATTEMPTS:
+                time.sleep(3)   # give C's cold start time to finish, then retry
+
+    print("All GCP infer attempts failed; recording no tags (no mock).")
+    return {}
 
 
 def s3_url(bucket, key):

@@ -92,7 +92,7 @@ Resources:
       Runtime: python3.12
       CodeUri: ../services/pipeline/orchestrator/
       Handler: app.lambda_handler
-      Timeout: 60
+      Timeout: 150   # allow up to 3 retries x 30s when C is cold-starting
       MemorySize: 256
       Environment:
         Variables:

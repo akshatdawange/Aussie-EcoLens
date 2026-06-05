@@ -75,7 +75,7 @@ def infer_frame(image_bytes):
         headers={"Content-Type": "image/jpeg", "X-EcoLens-Secret": secret},
     )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8")).get("counts", {})
     except Exception as exc:
         print(f"infer failed for a frame: {exc}")
