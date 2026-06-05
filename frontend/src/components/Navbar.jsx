@@ -1,58 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from 'react-oidc-context';
-import { buildLogoutUrl } from '../config/auth';
-import './Navbar.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import "./Navbar.css";
 
 const NAV_LINKS = [
-  { path: '/upload', label: 'Upload'   },
-  { path: '/search', label: 'Search'   },
-  { path: '/files',  label: 'My Files' },
+  { path: "/home", label: "Home" },
+  { path: "/upload", label: "Upload" },
+  { path: "/search", label: "Search" },
+  { path: "/files", label: "My Uploads" },
 ];
 
 const Navbar = () => {
-  const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const isLoggedIn = !!sessionStorage.getItem("idToken");
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const handleSignOut = () => {
-    const logoutUrl = buildLogoutUrl();
-    auth.removeUser();
-    if (logoutUrl) {
-      window.location.href = logoutUrl;
-    } else {
-      navigate('/');
-    }
+    sessionStorage.clear();
+    navigate("/");
   };
 
-  const firstName = auth.user?.profile?.given_name || 'User';
-
   return (
-    <nav className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`}>
+    <nav className={`navbar ${scrolled ? "navbar--scrolled" : ""}`}>
       <div className="navbar__inner">
-
         {/* Logo */}
-        <button className="navbar__logo" onClick={() => navigate('/')}>
-          <span className="navbar__logo-text">
-            Aussie<span className="navbar__logo-accent">EcoLens</span>
-          </span>
+        <button
+          className="navbar__logo"
+          onClick={() => navigate(isLoggedIn ? "/home" : "/")}
+        >
+          AussieEcoLens
         </button>
 
-        {/* Desktop nav links — only shown when logged in */}
-        {auth.isAuthenticated && (
+        {/* Desktop links - only when logged in */}
+        {isLoggedIn && (
           <div className="navbar__links">
             {NAV_LINKS.map(({ path, label }) => (
               <button
                 key={path}
-                className={`navbar__link ${location.pathname === path ? 'navbar__link--active' : ''}`}
+                className={`navbar__link ${location.pathname === path ? "navbar__link--active" : ""}`}
                 onClick={() => navigate(path)}
               >
                 {label}
@@ -61,40 +54,40 @@ const Navbar = () => {
           </div>
         )}
 
-            <div className="navbar__actions">
-                {auth.isAuthenticated && (
-                    <>
-                    <div className="navbar__user">
-                        <span className="navbar__user-avatar">
-                         {firstName.charAt(0).toUpperCase()}
-                        </span>
-                        <span className="navbar__user-name">{firstName}</span>
-                    </div>
-                    <button className="navbar__signout" onClick={handleSignOut}>
-                        Sign out
-                    </button>
-                </>
-                )}
-            </div>
+        {/* Right actions */}
+        <div className="navbar__actions">
+          {isLoggedIn ? (
+            <button className="navbar__signout" onClick={handleSignOut}>
+              Sign out
+            </button>
+          ) : null}
+        </div>
 
         {/* Mobile hamburger */}
-        <button
-          className={`navbar__hamburger ${menuOpen ? 'open' : ''}`}
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Toggle menu"
-        >
-          <span /><span /><span />
-        </button>
+        {isLoggedIn && (
+          <button
+            className={`navbar__hamburger ${menuOpen ? "open" : ""}`}
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle menu"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        )}
       </div>
 
-      {/* Mobile dropdown */}
-      {menuOpen && auth.isAuthenticated && (
+      {/* Mobile menu */}
+      {menuOpen && isLoggedIn && (
         <div className="navbar__mobile-menu animate-fade-in">
           {NAV_LINKS.map(({ path, label }) => (
             <button
               key={path}
-              className={`navbar__mobile-link ${location.pathname === path ? 'active' : ''}`}
-              onClick={() => { navigate(path); setMenuOpen(false); }}
+              className={`navbar__mobile-link ${location.pathname === path ? "active" : ""}`}
+              onClick={() => {
+                navigate(path);
+                setMenuOpen(false);
+              }}
             >
               {label}
             </button>

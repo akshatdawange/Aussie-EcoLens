@@ -10,6 +10,7 @@ import UploadPage   from './pages/UploadPage';
 import SearchPage   from './pages/SearchPage';
 import MyFilesPage  from './pages/MyFilesPage';
 import NotFoundPage from './pages/NotFoundPage';
+import HomePage from './pages/HomePage';
 
 const App = () => {
   const auth = useAuth();
@@ -20,6 +21,7 @@ const App = () => {
         <Route path="/"       element={<LandingPage />} />
         <Route path="/signin" element={<Navigate to="/" replace />} />
         <Route path="/signup" element={<Navigate to="/" replace />} />
+        <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/upload" element={<ProtectedRoute><UploadPage /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
         <Route path="/files"  element={<ProtectedRoute><MyFilesPage /></ProtectedRoute>} />

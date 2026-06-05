@@ -108,3 +108,12 @@ button, label, nav,
 .auth-card * {
   font-family: var(--font-display);
 }
+
+/* Inner app pages: use the display font (Syne) everywhere so text doesn't
+   fall back to the wide monospace body font and look stretched out. */
+.home-page, .home-page *,
+.upload-page, .upload-page *,
+.search-page, .search-page *,
+.myfiles-page, .myfiles-page * {
+  font-family: var(--font-display);
+}

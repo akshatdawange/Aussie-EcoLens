@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { searchBySpecies, searchByTagCounts, searchByImage, getFileByThumbnail } from '../utils/api';
+import { searchBySpecies, searchByTagCounts, searchByImage, getFileByThumbnail, getMediaUrl, normalizeMedia } from '../utils/api';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
 import ImageModal from '../components/ImageModal';
@@ -8,8 +8,18 @@ import './SearchPage.css';
 const SEARCH_MODES = [
   { id: 'tags',      label: 'By Species Tags'   },
   { id: 'thumbnail', label: 'By Thumbnail URL'  },
-  { id: 'file',      label: 'By Uploaded Photo' },
+  // { id: 'file',  label: 'By Uploaded Photo' }, // re-enable when the GCP inference endpoint (Member C) is deployed
 ];
+
+// Search endpoints return slightly different envelopes (array, {files}, {results}...).
+// Flatten to a list of normalised media records the cards can render reliably.
+const toMediaList = (data) => {
+  const raw = Array.isArray(data)
+    ? data
+    : data?.files || data?.results || data?.items || data?.matches ||
+      (data && (data.originalUrl || data.thumbnailUrl || data.url) ? [data] : []);
+  return raw.map(normalizeMedia);
+};
 
 const SearchPage = () => {
   const [mode, setMode] = useState('tags');
@@ -63,7 +73,7 @@ const SearchPage = () => {
       if (!queryFile) { setError('Select a file.'); setLoading(false); return; }
       data = await searchByImage(queryFile);
     }
-    setResults(Array.isArray(data) ? data : [data]);
+    setResults(toMediaList(data));
   } catch (err) {
     setError(err.message || 'Search failed.');
   } finally {
@@ -184,9 +194,17 @@ const SearchPage = () => {
               <div className="search-grid">
                 {results.map((item, i) => (
                   <ResultCard
-                    key={i}
+                    key={item.fileId || i}
                     item={item}
-                    onClick={() => setModalUrl(item.full_url || item.url)}
+                    onClick={async () => {
+                      const target = item.originalUrl || item.thumbnailUrl;
+                      if (!target) return;
+                      try {
+                        setModalUrl(await getMediaUrl(target));
+                      } catch {
+                        setModalUrl(target);
+                      }
+                    }}
                   />
                 ))}
               </div>
@@ -202,28 +220,33 @@ const SearchPage = () => {
   );
 };
 
-const ResultCard = ({ item, onClick }) => (
-  <div className="result-card" onClick={onClick} role="button" tabIndex={0}>
-    <div className="result-card__thumb">
-      {item.thumbnailUrl
-        ? <img src={item.thumbnailUrl} alt="Wildlife" loading="lazy" />
-        : <span className="result-card__placeholder">▶</span>
-      }
-      <div className="result-card__overlay"><span>View full size</span></div>
-    </div>
-    {item.tagCounts && (
-      <div className="result-card__tags">
-        {Object.keys(item.tagCounts).slice(0, 3).map(tag => (
-          <span key={tag} className="result-card__tag">{tag}</span>
-        ))}
-        {Object.keys(item.tagCounts).length > 3 && (
-          <span className="result-card__tag result-card__tag--more">
-            +{Object.keys(item.tagCounts).length - 3}
-          </span>
-        )}
+const ResultCard = ({ item, onClick }) => {
+  const tagEntries = Object.entries(item.tagCounts || {});
+  return (
+    <div className="result-card" onClick={onClick} role="button" tabIndex={0}>
+      <div className="result-card__thumb">
+        {item.thumbnailUrl
+          ? <img src={item.thumbnailUrl} alt="Wildlife observation" loading="lazy" />
+          : <span className="result-card__placeholder">▶</span>
+        }
+        <div className="result-card__overlay"><span>View full size</span></div>
       </div>
-    )}
-  </div>
-);
+      {tagEntries.length > 0 && (
+        <div className="result-card__tags">
+          {tagEntries.slice(0, 3).map(([tag, count]) => (
+            <span key={tag} className="result-card__tag">
+              {tag}<em>×{count}</em>
+            </span>
+          ))}
+          {tagEntries.length > 3 && (
+            <span className="result-card__tag result-card__tag--more">
+              +{tagEntries.length - 3}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default SearchPage;

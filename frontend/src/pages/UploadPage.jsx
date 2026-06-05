@@ -1,20 +1,26 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { computeChecksum } from '../utils/checksum';
-import { uploadFile } from '../utils/api';
+import { uploadFile, getMyFiles } from '../utils/api';
 import Button from '../components/Button';
 import './UploadPage.css';
 
 const ACCEPTED = ['image/jpeg','image/png','image/webp','video/mp4','video/quicktime'];
 const MAX_MB = 100;
 
+// How long to wait for the tagging Lambda to write detected species to the DB.
+const TAG_POLL_ATTEMPTS = 12;
+const TAG_POLL_INTERVAL = 2500;
+
 const STATUS = {
-  ready:        { label: 'Ready',        color: 'var(--text-muted)'   },
-  checksumming: { label: 'Verifying...', color: 'var(--amber)'        },
-  uploading:    { label: 'Uploading...', color: 'var(--accent)'       },
-  done:         { label: 'Uploaded ✓',   color: 'var(--success)'      },
-  duplicate:    { label: 'Duplicate ⚠',  color: 'var(--warning)'      },
-  error:        { label: 'Error ✗',      color: 'var(--error)'        },
+  ready:        { label: 'Ready',         color: 'var(--text-muted)'   },
+  checksumming: { label: 'Verifying...',  color: 'var(--amber)'        },
+  uploading:    { label: 'Uploading...',  color: 'var(--accent)'       },
+  processing:   { label: 'Detecting...',  color: 'var(--amber)'        },
+  done:         { label: 'Uploaded ✓',    color: 'var(--success)'      },
+  duplicate:    { label: 'Duplicate ⚠',   color: 'var(--warning)'      },
+  error:        { label: 'Error ✗',       color: 'var(--error)'        },
 };
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const UploadPage = () => {
   const inputRef = useRef(null);
@@ -48,20 +54,48 @@ const UploadPage = () => {
     const u = [...prev]; u[i] = { ...u[i], ...patch }; return u;
   });
 
+  // Poll the files API until the tagging Lambda has written detected species
+  // for the freshly uploaded file (matched by fileId), then return its tags.
+  const pollForTags = async (fileId) => {
+    if (!fileId) return null;
+    for (let attempt = 0; attempt < TAG_POLL_ATTEMPTS; attempt++) {
+      await sleep(TAG_POLL_INTERVAL);
+      try {
+        const myFiles = await getMyFiles();
+        const match = myFiles.find(f => f.fileId === fileId);
+        if (match && Object.keys(match.tagCounts || {}).length > 0) {
+          return match.tagCounts;
+        }
+      } catch {
+        /* keep polling */
+      }
+    }
+    return null;
+  };
+
   const uploadAll = async () => {
     for (let i = 0; i < files.length; i++) {
       if (files[i].status !== 'ready') continue;
+
       setStatus(i, { status: 'checksumming' });
-      let checksum;
+
       try {
-        checksum = await computeChecksum(files[i].file);
-      } catch {
-        setStatus(i, { status: 'error', error: 'Checksum failed' }); continue;
-      }
-      setStatus(i, { status: 'uploading' });
-      try {
-        const result = await uploadFile(files[i].file, checksum);
-        setStatus(i, { status: result.duplicate ? 'duplicate' : 'done' });
+        setStatus(i, { status: 'uploading' });
+        const result = await uploadFile(files[i].file);
+
+        // Upload landed - now wait for ML tagging to complete and surface the
+        // detected species right here on the upload page.
+        setStatus(i, {
+          status: result.duplicate ? 'duplicate' : 'processing',
+          fileId: result.fileId,
+        });
+
+        const tags = await pollForTags(result.fileId);
+        setStatus(i, {
+          status: result.duplicate ? 'duplicate' : 'done',
+          tags: tags || {},
+          tagsResolved: true,
+        });
       } catch (err) {
         setStatus(i, { status: 'error', error: err.message });
       }
@@ -134,10 +168,11 @@ const UploadPage = () => {
 };
 
 const FileRow = ({ entry, onRemove }) => {
-  const { file, preview, status, error } = entry;
+  const { file, preview, status, error, tags, tagsResolved } = entry;
   const cfg = STATUS[status] || STATUS.ready;
   const isVideo = file.type.startsWith('video/');
   const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+  const tagEntries = Object.entries(tags || {});
 
   return (
     <div className={`file-row file-row--${status}`}>
@@ -153,6 +188,24 @@ const FileRow = ({ entry, onRemove }) => {
           {sizeMB} MB · {file.type.split('/')[1].toUpperCase()}
         </span>
         {error && <span className="file-row__error">{error}</span>}
+
+        {status === 'processing' && (
+          <span className="file-row__detecting">Detecting species...</span>
+        )}
+
+        {tagEntries.length > 0 && (
+          <div className="file-row__tags">
+            {tagEntries.map(([tag, count]) => (
+              <span key={tag} className="file-row__tag">
+                {tag}<em>×{count}</em>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {tagsResolved && tagEntries.length === 0 && !isVideo && (
+          <span className="file-row__meta">No species detected</span>
+        )}
       </div>
       <span className="file-row__status" style={{ color: cfg.color }}>
         {cfg.label}
