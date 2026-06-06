@@ -8,7 +8,7 @@ import './SearchPage.css';
 const SEARCH_MODES = [
   { id: 'tags',      label: 'By Species Tags'   },
   { id: 'thumbnail', label: 'By Thumbnail URL'  },
-  // { id: 'file',  label: 'By Uploaded Photo' }, // re-enable when the GCP inference endpoint (Member C) is deployed
+  { id: 'file',      label: 'By Uploaded Photo' },
 ];
 
 // Search endpoints return slightly different envelopes (array, {files}, {results}...).

@@ -65,14 +65,21 @@ const SpeciesAlerts = () => {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
   const email = getUserEmail();
 
   const load = async () => {
     try {
       const data = await getSubscriptions();
-      setSpecies(parseSubscriptions(data));
+      const list = parseSubscriptions(data);
+      setSpecies(list);
+      // SNS won't deliver until the email endpoint is confirmed; the backend
+      // reports this as a "PendingConfirmation" ARN.
+      const arn = data?.subscriptionArn;
+      setPending(list.length > 0 && (!arn || arn === "PendingConfirmation"));
     } catch {
       setSpecies([]);
+      setPending(false);
     }
   };
 
@@ -166,6 +173,14 @@ const SpeciesAlerts = () => {
             </div>
           ) : (
             <p className="alerts__empty">No species watched yet.</p>
+          )}
+
+          {pending && (
+            <p className="alerts__pending">
+              Almost there: check your inbox (and spam) for an AWS subscription
+              confirmation email and click "Confirm subscription". Alerts only
+              start once confirmed.
+            </p>
           )}
 
           {error && <p className="alerts__error">{error}</p>}
