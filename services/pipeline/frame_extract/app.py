@@ -31,6 +31,7 @@ ddb = boto3.resource("dynamodb")
 sns = boto3.client("sns")
 
 FRAMES_BUCKET = os.environ["FRAMES_BUCKET"]
+THUMBNAILS_BUCKET = os.environ["THUMBNAILS_BUCKET"]   # public bucket for the video poster
 ORIGINALS_BUCKET = os.environ["ORIGINALS_BUCKET"]
 MAIN_TABLE = os.environ["MAIN_TABLE"]
 REGION = os.environ.get("AWS_REGION", "ap-southeast-2")
@@ -91,8 +92,8 @@ def s3_url(bucket, key):
     return f"https://{bucket}.s3.{REGION}.amazonaws.com/{urllib.parse.quote(key)}"
 
 
-def publish_tags(counts, file_id):
-    """Notify subscribers via SNS. The 'species' String.Array attribute lets D's
+def publish_tags(counts, file_id, filename, file_type, preview_url):
+    """Send an informative SNS email. The 'species' String.Array attribute lets D's
     subscription filter policies deliver only the species each user follows."""
     if not counts:
         return
@@ -101,11 +102,23 @@ def publish_tags(counts, file_id):
         print("No SNS topic ARN in SSM; skipping notification.")
         return
     species = sorted(counts.keys())   # already normalised (lowercase + trimmed)
+    detected = "\n".join(f"  - {sp} (x{counts[sp]})" for sp in species)
+    when = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    message = (
+        f"A new {file_type} was added to Aussie EcoLens.\n\n"
+        f"Species detected:\n{detected}\n\n"
+        f"File name : {filename}\n"
+        f"Type      : {file_type}\n"
+        f"Added     : {when}\n"
+        f"Preview   : {preview_url}\n\n"
+        f"Log in to Aussie EcoLens to view, search, or download the full {file_type}.\n\n"
+        f"You are receiving this because you subscribed to: {', '.join(species)}.\n"
+        f"(reference id: {file_id})"
+    )
+    subject = (f"EcoLens: new {file_type} - {', '.join(species)}")[:100]  # SNS subject max 100 chars
     try:
         sns.publish(
-            TopicArn=topic_arn,
-            Subject="EcoLens: new wildlife detected (video)",
-            Message=f"New video tagged with: {', '.join(species)} (fileId {file_id}).",
+            TopicArn=topic_arn, Subject=subject, Message=message,
             MessageAttributes={
                 "species": {"DataType": "String.Array", "StringValue": json.dumps(species)}
             },
@@ -142,9 +155,10 @@ def process(bucket, key):
     if frames:
         with open(frames[0], "rb") as fh:
             poster_bytes = fh.read()
-        poster_key = f"{owner_sub}/{file_id}/frames/poster.jpg"
-        s3.put_object(Bucket=FRAMES_BUCKET, Key=poster_key, Body=poster_bytes, ContentType="image/jpeg")
-        poster_url = s3_url(FRAMES_BUCKET, poster_key)
+        # Poster goes in the PUBLIC thumbnails bucket so A can show it in the gallery (like image thumbs).
+        poster_key = f"{owner_sub}/{file_id}/poster.jpg"
+        s3.put_object(Bucket=THUMBNAILS_BUCKET, Key=poster_key, Body=poster_bytes, ContentType="image/jpeg")
+        poster_url = s3_url(THUMBNAILS_BUCKET, poster_key)
 
     # Run inference on the frames IN PARALLEL (big speed-up vs one-by-one).
     to_infer = frames[:MAX_INFER_FRAMES]
@@ -158,7 +172,7 @@ def process(bucket, key):
 
     print(f"Aggregated video tags from {len(to_infer)} frames: {aggregated}")
     write_records(file_id, owner_sub, key, filename, aggregated, poster_url)
-    publish_tags(aggregated, file_id)
+    publish_tags(aggregated, file_id, filename, "video", poster_url)
 
 
 def write_records(file_id, owner_sub, key, filename, counts, poster_url):

@@ -70,7 +70,7 @@ Resources:
       Handler: app.lambda_handler
       Environment:
         Variables:
-          MEDIA_URL_TTL: "300"
+          MEDIA_URL_TTL: "3600"   # 1 hour - enough for full video playback without expiring
       Policies:
         - Statement:
             - Sid: ReadOriginalsForPresign
@@ -171,6 +171,7 @@ Resources:
       Environment:
         Variables:
           FRAMES_BUCKET: !Sub "ecolens-frames-${AWS::AccountId}"
+          THUMBNAILS_BUCKET: !Sub "ecolens-thumbnails-${AWS::AccountId}"
           MAIN_TABLE: EcoLensMain
       Policies:
         - Statement:
@@ -182,6 +183,10 @@ Resources:
               Effect: Allow
               Action: s3:PutObject
               Resource: !Sub "arn:aws:s3:::ecolens-frames-${AWS::AccountId}/*"
+            - Sid: WriteThumbnailsBucket
+              Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "arn:aws:s3:::ecolens-thumbnails-${AWS::AccountId}/*"
             - Sid: WriteMainTable
               Effect: Allow
               Action: dynamodb:PutItem

@@ -100,8 +100,8 @@ def s3_url(bucket, key):
     return f"https://{bucket}.s3.{REGION}.amazonaws.com/{urllib.parse.quote(key)}"
 
 
-def publish_tags(counts, file_id):
-    """Notify subscribers via SNS. The 'species' String.Array attribute lets D's
+def publish_tags(counts, file_id, filename, file_type, preview_url):
+    """Send an informative SNS email. The 'species' String.Array attribute lets D's
     subscription filter policies deliver only the species each user follows."""
     if not counts:
         return
@@ -110,11 +110,23 @@ def publish_tags(counts, file_id):
         print("No SNS topic ARN in SSM; skipping notification.")
         return
     species = sorted(counts.keys())   # already normalised (lowercase + trimmed)
+    detected = "\n".join(f"  - {sp} (x{counts[sp]})" for sp in species)
+    when = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    message = (
+        f"A new {file_type} was added to Aussie EcoLens.\n\n"
+        f"Species detected:\n{detected}\n\n"
+        f"File name : {filename}\n"
+        f"Type      : {file_type}\n"
+        f"Added     : {when}\n"
+        f"Preview   : {preview_url}\n\n"
+        f"Log in to Aussie EcoLens to view, search, or download the full {file_type}.\n\n"
+        f"You are receiving this because you subscribed to: {', '.join(species)}.\n"
+        f"(reference id: {file_id})"
+    )
+    subject = (f"EcoLens: new {file_type} - {', '.join(species)}")[:100]  # SNS subject max 100 chars
     try:
         sns.publish(
-            TopicArn=topic_arn,
-            Subject="EcoLens: new wildlife detected",
-            Message=f"New media tagged with: {', '.join(species)} (fileId {file_id}).",
+            TopicArn=topic_arn, Subject=subject, Message=message,
             MessageAttributes={
                 "species": {"DataType": "String.Array", "StringValue": json.dumps(species)}
             },
@@ -166,7 +178,7 @@ def process(bucket, key):
         })
 
     print(f"Wrote META + {len(counts)} SPECIES rows for file {file_id}: {counts}")
-    publish_tags(counts, file_id)
+    publish_tags(counts, file_id, filename, "image", thumb_url)
 
 
 def lambda_handler(event, context):
