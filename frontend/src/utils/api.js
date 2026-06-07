@@ -39,7 +39,10 @@ export const normalizeMedia = (item = {}) => {
     item.fileId || item.file_id || item.id || item.checksum || item.sha256 ||
     originalUrl;
 
-  let tagCounts = item.tagCounts || item.tag_counts || item.counts || item.tags || {};
+  // matchedSpecies is what /search/by-image returns for each result.
+  let tagCounts =
+    item.tagCounts || item.tag_counts || item.counts ||
+    item.matchedSpecies || item.matched_species || item.tags || {};
   if (Array.isArray(tagCounts)) {
     tagCounts = Object.fromEntries(
       tagCounts.map(t =>

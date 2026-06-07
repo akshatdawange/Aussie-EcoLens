@@ -52,6 +52,45 @@
   border-radius: 100px;
 }
 
+/* Bulk tag editor */
+.myfiles-tagedit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--bg-deep);
+  border: 1px solid rgba(200,169,110,0.25);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+}
+
+.myfiles-tagedit__label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.myfiles-tagedit__input {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 13px;
+  padding: 8px 12px;
+}
+.myfiles-tagedit__input:focus { outline: none; border-color: var(--accent); }
+
+.myfiles-tagedit__msg {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--accent);
+  width: 100%;
+}
+
 /* States */
 .myfiles-loading {
   display: flex;
