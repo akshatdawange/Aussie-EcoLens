@@ -4,7 +4,6 @@ import "./Navbar.css";
 
 const NAV_LINKS = [
   { path: "/home", label: "Home" },
-  { path: "/upload", label: "Upload" },
   { path: "/search", label: "Search" },
   { path: "/files", label: "My Uploads" },
 ];

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from "react";
-import { uploadFile, getMyFiles } from "../utils/api";
-import Button from "../components/Button";
-import "./UploadPage.css";
+import { uploadFile, getMyFiles, getFeed } from "../utils/api";
+import Button from "./Button";
+import "../pages/UploadPage.css";
 
 const ACCEPTED = [
   "image/jpeg",
@@ -28,7 +28,9 @@ const STATUS = {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const UploadPage = () => {
+// Embeddable uploader. Calls onUploaded() after each file lands so the parent
+// (e.g. the Home feed) can refresh.
+const UploadWidget = ({ onUploaded }) => {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState([]);
@@ -97,6 +99,18 @@ const UploadPage = () => {
     return null;
   };
 
+  // Look up an already-stored file by id (used to show the existing copy on a
+  // duplicate upload). Uses the feed since the original may belong to anyone.
+  const findExistingFile = async (fileId) => {
+    if (!fileId) return null;
+    try {
+      const feed = await getFeed();
+      return feed.find((f) => f.fileId === fileId) || null;
+    } catch {
+      return null;
+    }
+  };
+
   const uploadAll = async () => {
     for (let i = 0; i < files.length; i++) {
       if (files[i].status !== "ready") continue;
@@ -107,19 +121,27 @@ const UploadPage = () => {
         setStatus(i, { status: "uploading" });
         const result = await uploadFile(files[i].file);
 
-        // Upload landed - now wait for ML tagging to complete and surface the
-        // detected species right here on the upload page.
-        setStatus(i, {
-          status: result.duplicate ? "duplicate" : "processing",
-          fileId: result.fileId,
-        });
-
-        const tags = await pollForTags(result.fileId);
-        setStatus(i, {
-          status: result.duplicate ? "duplicate" : "done",
-          tags: tags || {},
-          tagsResolved: true,
-        });
+        if (result.duplicate) {
+          // Already in storage - surface the existing copy + its tags.
+          setStatus(i, { status: "duplicate", fileId: result.fileId });
+          const existing = await findExistingFile(result.fileId);
+          setStatus(i, {
+            existingThumb: existing?.thumbnailUrl || null,
+            tags: existing?.tagCounts || {},
+            tagsResolved: true,
+          });
+        } else {
+          // Wait for ML tagging to complete and surface detected species here.
+          setStatus(i, { status: "processing", fileId: result.fileId });
+          onUploaded?.(); // new file is in storage - refresh the feed
+          const tags = await pollForTags(result.fileId);
+          setStatus(i, {
+            status: "done",
+            tags: tags || {},
+            tagsResolved: true,
+          });
+        }
+        onUploaded?.();
       } catch (err) {
         setStatus(i, { status: "error", error: err.message });
       }
@@ -129,91 +151,82 @@ const UploadPage = () => {
   const readyCount = files.filter((f) => f.status === "ready").length;
 
   return (
-    <div className="upload-page">
-      <div className="upload-page__inner">
-        <div className="page-header animate-fade-up">
-          <h1 className="page-title">Upload Media</h1>
-          <p className="page-subtitle">
-            Images and videos are auto-tagged with detected species on upload.
-          </p>
-        </div>
-
-        <div
-          className={`dropzone ${dragging ? "dropzone--active" : ""} animate-fade-up`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-          onClick={() => inputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept={ACCEPTED.join(",")}
-            onChange={(e) => addFiles(Array.from(e.target.files))}
-            style={{ display: "none" }}
-          />
-          <div className="dropzone__icon">↑</div>
-          <p className="dropzone__primary">
-            {dragging ? "Drop to add" : "Drop files here or click to browse"}
-          </p>
-          <p className="dropzone__secondary">
-            JPG · PNG · WEBP · MP4 · MOV &nbsp;·&nbsp; Max {MAX_MB}MB
-          </p>
-        </div>
-
-        {files.length > 0 && (
-          <div className="upload-queue animate-fade-up">
-            <div className="upload-queue__header">
-              <span>
-                {files.length} file{files.length !== 1 ? "s" : ""} queued
-              </span>
-              <button
-                className="upload-queue__clear"
-                onClick={() => setFiles([])}
-              >
-                Clear all
-              </button>
-            </div>
-
-            <div className="upload-queue__list">
-              {files.map((entry, i) => (
-                <FileRow key={i} entry={entry} onRemove={() => remove(i)} />
-              ))}
-            </div>
-
-            {readyCount > 0 && (
-              <div className="upload-queue__footer">
-                <Button variant="primary" size="lg" onClick={uploadAll}>
-                  Upload {readyCount} file{readyCount !== 1 ? "s" : ""}
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
+    <>
+      <div
+        className={`dropzone ${dragging ? "dropzone--active" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept={ACCEPTED.join(",")}
+          onChange={(e) => addFiles(Array.from(e.target.files))}
+          style={{ display: "none" }}
+        />
+        <div className="dropzone__icon">↑</div>
+        <p className="dropzone__primary">
+          {dragging ? "Drop to add" : "Drop files here or click to browse"}
+        </p>
+        <p className="dropzone__secondary">
+          JPG · PNG · WEBP · MP4 · MOV &nbsp;·&nbsp; Max {MAX_MB}MB
+        </p>
       </div>
-    </div>
+
+      {files.length > 0 && (
+        <div className="upload-queue">
+          <div className="upload-queue__header">
+            <span>
+              {files.length} file{files.length !== 1 ? "s" : ""} queued
+            </span>
+            <button className="upload-queue__clear" onClick={() => setFiles([])}>
+              Clear all
+            </button>
+          </div>
+
+          <div className="upload-queue__list">
+            {files.map((entry, i) => (
+              <FileRow key={i} entry={entry} onRemove={() => remove(i)} />
+            ))}
+          </div>
+
+          {readyCount > 0 && (
+            <div className="upload-queue__footer">
+              <Button variant="primary" size="lg" onClick={uploadAll}>
+                Upload {readyCount} file{readyCount !== 1 ? "s" : ""}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 };
 
 const FileRow = ({ entry, onRemove }) => {
-  const { file, preview, status, error, tags, tagsResolved } = entry;
+  const { file, preview, status, error, tags, tagsResolved, existingThumb } =
+    entry;
   const cfg = STATUS[status] || STATUS.ready;
   const isVideo = file.type.startsWith("video/");
   const sizeMB = (file.size / 1024 / 1024).toFixed(1);
   const tagEntries = Object.entries(tags || {});
+  // On a duplicate, prefer the stored copy's thumbnail to prove the match.
+  const thumbSrc = existingThumb || preview;
 
   return (
     <div className={`file-row file-row--${status}`}>
       <div className="file-row__thumb">
-        {preview ? (
-          <img src={preview} alt={file.name} />
+        {thumbSrc ? (
+          <img src={thumbSrc} alt={file.name} />
         ) : (
           <span>{isVideo ? "▶" : "◈"}</span>
         )}
@@ -224,6 +237,12 @@ const FileRow = ({ entry, onRemove }) => {
           {sizeMB} MB · {file.type.split("/")[1].toUpperCase()}
         </span>
         {error && <span className="file-row__error">{error}</span>}
+
+        {status === "duplicate" && (
+          <span className="file-row__detecting">
+            Already in library - existing copy shown
+          </span>
+        )}
 
         {status === "processing" && (
           <span className="file-row__detecting">Detecting species...</span>
@@ -256,4 +275,4 @@ const FileRow = ({ entry, onRemove }) => {
   );
 };
 
-export default UploadPage;
+export default UploadWidget;

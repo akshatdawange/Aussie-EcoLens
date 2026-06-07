@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getMyFiles, getMediaUrl, getUserEmail,
+  getFeed, getMediaUrl, getUserEmail,
   getSubscriptions, createSubscription, deleteSubscription,
 } from "../utils/api";
 import ImageModal from "../components/ImageModal";
+import UploadWidget from "../components/UploadWidget";
 import "./HomePage.css";
 
 // SVG Icons - no emojis
@@ -196,18 +197,19 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [modalUrl, setModalUrl] = useState(null);
 
+  const loadFeed = async () => {
+    try {
+      const data = await getFeed();
+      setRecentFiles(data.slice(0, 8));
+    } catch {
+      setRecentFiles([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchFiles = async () => {
-      try {
-        const data = await getMyFiles();
-        setRecentFiles(data.slice(0, 8));
-      } catch {
-        setRecentFiles([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFiles();
+    loadFeed();
   }, []);
 
   return (
@@ -227,6 +229,17 @@ const HomePage = () => {
             </p>
           </div>
           <SpeciesAlerts />
+        </div>
+
+        {/* Upload */}
+        <div className="home-upload animate-fade-up">
+          <div className="home-recent__header">
+            <h2 className="home-recent__title">Upload media</h2>
+            <span className="home-upload__hint">
+              Auto-tagged with detected species on upload
+            </span>
+          </div>
+          <UploadWidget onUploaded={loadFeed} />
         </div>
 
         {/* Recent uploads */}

@@ -198,6 +198,15 @@ export const getMyFiles = async () => {
   return files;
 };
 
+// Community feed: everyone's uploads (view-only), no owner filtering.
+export const getFeed = async () => {
+  try {
+    return await fetchFiles("feed");
+  } catch {
+    return [];
+  }
+};
+
 export const getFileByThumbnail = async (thumbnailUrl) => {
   const params = new URLSearchParams({ thumbnailUrl });
   const res = await fetch(`${BASE}/files/by-thumbnail?${params}`, {
