@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getFeed, getMediaUrl, getUserEmail,
+  getFeed, getMyFiles, getMediaUrl, getUserEmail,
   getSubscriptions, createSubscription, deleteSubscription,
 } from "../utils/api";
 import ImageModal from "../components/ImageModal";
@@ -191,16 +191,44 @@ const SpeciesAlerts = () => {
   );
 };
 
+const StatCard = ({ label, value }) => (
+  <div className="home-stat">
+    <span className="home-stat__label">{label}</span>
+    <span className="home-stat__value">{value}</span>
+  </div>
+);
+
 const HomePage = () => {
   const navigate = useNavigate();
   const [recentFiles, setRecentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalUrl, setModalUrl] = useState(null);
+  const [stats, setStats] = useState({
+    yourUploads: 0,
+    speciesTagged: 0,
+    communityObs: 0,
+    activeAlerts: 0,
+  });
 
-  const loadFeed = async () => {
+  // All stats are derived client-side from existing endpoints - no backend work.
+  const loadHome = async () => {
     try {
-      const data = await getFeed();
-      setRecentFiles(data.slice(0, 8));
+      const [feed, mine, subs] = await Promise.all([
+        getFeed(),
+        getMyFiles().catch(() => []),
+        getSubscriptions().catch(() => null),
+      ]);
+      setRecentFiles(feed.slice(0, 8));
+      const species = new Set();
+      mine.forEach((f) =>
+        Object.keys(f.tagCounts || {}).forEach((t) => species.add(t)),
+      );
+      setStats({
+        yourUploads: mine.length,
+        speciesTagged: species.size,
+        communityObs: feed.length,
+        activeAlerts: parseSubscriptions(subs).length,
+      });
     } catch {
       setRecentFiles([]);
     } finally {
@@ -209,7 +237,7 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    loadFeed();
+    loadHome();
   }, []);
 
   return (
@@ -231,6 +259,17 @@ const HomePage = () => {
           <SpeciesAlerts />
         </div>
 
+        {/* Stats */}
+        <div className="home-stats animate-fade-up">
+          <StatCard label="Your uploads" value={stats.yourUploads} />
+          <StatCard label="Species you've tagged" value={stats.speciesTagged} />
+          <StatCard
+            label="Community observations"
+            value={stats.communityObs.toLocaleString()}
+          />
+          <StatCard label="Active alerts" value={stats.activeAlerts} />
+        </div>
+
         {/* Upload */}
         <div className="home-upload animate-fade-up">
           <div className="home-recent__header">
@@ -239,7 +278,7 @@ const HomePage = () => {
               Auto-tagged with detected species on upload
             </span>
           </div>
-          <UploadWidget onUploaded={loadFeed} />
+          <UploadWidget onUploaded={loadHome} />
         </div>
 
         {/* Recent uploads */}
@@ -309,21 +348,27 @@ const HomePage = () => {
                       )}
                       <div className="home-grid-card__overlay">View</div>
                     </div>
-                    {tagEntries.length > 0 && (
-                      <div className="home-grid-card__tags">
-                        {tagEntries.slice(0, 2).map(([tag, count]) => (
-                          <span key={tag} className="home-grid-card__tag">
-                            {tag}
-                            <em>×{count}</em>
-                          </span>
-                        ))}
-                        {tagEntries.length > 2 && (
-                          <span className="home-grid-card__tag">
-                            +{tagEntries.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    <div className="home-grid-card__tags">
+                      {tagEntries.length > 0 ? (
+                        <>
+                          {tagEntries.slice(0, 2).map(([tag, count]) => (
+                            <span key={tag} className="home-grid-card__tag">
+                              {tag}
+                              <em>×{count}</em>
+                            </span>
+                          ))}
+                          {tagEntries.length > 2 && (
+                            <span className="home-grid-card__tag">
+                              +{tagEntries.length - 2}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="home-grid-card__tag home-grid-card__tag--none">
+                          No species
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
