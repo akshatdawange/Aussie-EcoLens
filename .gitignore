@@ -1,0 +1,33 @@
+# Model files (too big for Git — uploaded to GCS instead)
+*.pt
+*.onnx
+*.h5
+models/
+
+# Test fixtures (large; not committed)
+test_images/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+env/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Secrets
+.env
+*.key
+service-account*.json
+
+# Outputs
+mg_detections.json
+cropped_images/
+*.log

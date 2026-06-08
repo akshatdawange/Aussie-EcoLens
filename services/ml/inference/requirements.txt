@@ -1,0 +1,11 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+python-multipart==0.0.9
+pyjwt[crypto]==2.9.0
+google-cloud-storage==2.18.2
+pillow==10.4.0
+numpy<2
+# megadetector pulls in torch + torchvision (CPU). It transitively caps
+# protobuf<=3.20.1 via ultralytics-yolov5; onnx is installed separately in the
+# Dockerfile with --no-deps to sidestep that over-conservative pin.
+megadetector==5.0.25
