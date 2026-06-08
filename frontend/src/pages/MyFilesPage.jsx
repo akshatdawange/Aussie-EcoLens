@@ -165,6 +165,7 @@ const MyFilesPage = () => {
             >
               Add tags
             </Button>
+
             <Button
               variant="ghost"
               size="sm"
@@ -231,7 +232,9 @@ const MyFilesPage = () => {
 };
 
 const FileCard = ({ file, selected, onSelect, onView }) => {
+  const [expanded, setExpanded] = useState(false);
   const tagEntries = Object.entries(file.tagCounts || {});
+  const shown = expanded ? tagEntries : tagEntries.slice(0, 2);
   return (
     <div className={`file-card ${selected ? "file-card--selected" : ""}`}>
       <div className="file-card__thumb" onClick={onView}>
@@ -248,14 +251,23 @@ const FileCard = ({ file, selected, onSelect, onView }) => {
       </div>
       <div className="file-card__footer">
         <div className="file-card__tags">
-          {tagEntries.slice(0, 2).map(([tag, count]) => (
+          {shown.map(([tag, count]) => (
             <span key={tag} className="file-card__tag">
               {tag}
               <em>×{count}</em>
             </span>
           ))}
           {tagEntries.length > 2 && (
-            <span className="file-card__tag">+{tagEntries.length - 2}</span>
+            <button
+              type="button"
+              className="file-card__tag file-card__tag--toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((v) => !v);
+              }}
+            >
+              {expanded ? "show less" : `+${tagEntries.length - 2}`}
+            </button>
           )}
         </div>
         <input

@@ -1,14 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getFeed, getMyFiles, getMediaUrl, getUserEmail,
-  getSubscriptions, createSubscription, deleteSubscription,
+  getFeed,
+  getMyFiles,
+  getMediaUrl,
+  getUserEmail,
+  getUserSub,
+  getSubscriptions,
+  createSubscription,
+  deleteSubscription,
 } from "../utils/api";
 import ImageModal from "../components/ImageModal";
 import UploadWidget from "../components/UploadWidget";
 import "./HomePage.css";
 
-// SVG Icons - no emojis
+// SVG Icons
 const UploadIcon = () => (
   <svg
     width="18"
@@ -60,27 +66,31 @@ const parseSubscriptions = (data) => {
   return [];
 };
 
-const SpeciesAlerts = () => {
+const SpeciesAlerts = ({ onToast }) => {
   const [open, setOpen] = useState(false);
   const [species, setSpecies] = useState([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
   const email = getUserEmail();
+
+  // Fetch subscriptions and return whether the email endpoint is still
+  // unconfirmed (SNS reports this as a "PendingConfirmation" ARN).
+  const refresh = async () => {
+    const data = await getSubscriptions();
+    const list = parseSubscriptions(data);
+    const arn = data?.subscriptionArn;
+    const isPending =
+      list.length > 0 && (!arn || arn === "PendingConfirmation");
+    setSpecies(list);
+    return isPending;
+  };
 
   const load = async () => {
     try {
-      const data = await getSubscriptions();
-      const list = parseSubscriptions(data);
-      setSpecies(list);
-      // SNS won't deliver until the email endpoint is confirmed; the backend
-      // reports this as a "PendingConfirmation" ARN.
-      const arn = data?.subscriptionArn;
-      setPending(list.length > 0 && (!arn || arn === "PendingConfirmation"));
+      await refresh();
     } catch {
       setSpecies([]);
-      setPending(false);
     }
   };
 
@@ -97,9 +107,10 @@ const SpeciesAlerts = () => {
       } else {
         await createSubscription(email, list);
       }
-      await load();
+      return await refresh();
     } catch (e) {
       setError(e.message || "Could not update alerts.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -114,7 +125,16 @@ const SpeciesAlerts = () => {
     const next = [...species, val];
     setSpecies(next);
     setInput("");
-    await persist(next);
+    const isPending = await persist(next);
+    if (isPending) {
+      onToast?.(
+        'Check your inbox (and spam) and click "Confirm subscription" in the AWS email to start receiving alerts.',
+      );
+    } else {
+      onToast?.(
+        `You're now watching "${val}" - we'll email you when it's tagged.`,
+      );
+    }
   };
 
   const removeSpecies = async (tag) => {
@@ -140,8 +160,9 @@ const SpeciesAlerts = () => {
         <div className="alerts__panel animate-fade-in">
           <p className="alerts__title">Email me when new media is tagged</p>
           <p className="alerts__sub">
-            Get an email at {email || "your address"} whenever a new file is
-            tagged with a species you watch.
+            Get an email at{" "}
+            <span className="alerts__email">{email || "your address"}</span>{" "}
+            whenever a new file is tagged with a species you watch.
           </p>
 
           <div className="alerts__input-row">
@@ -176,14 +197,6 @@ const SpeciesAlerts = () => {
             <p className="alerts__empty">No species watched yet.</p>
           )}
 
-          {pending && (
-            <p className="alerts__pending">
-              Almost there: check your inbox (and spam) for an AWS subscription
-              confirmation email and click "Confirm subscription". Alerts only
-              start once confirmed.
-            </p>
-          )}
-
           {error && <p className="alerts__error">{error}</p>}
         </div>
       )}
@@ -198,11 +211,66 @@ const StatCard = ({ label, value }) => (
   </div>
 );
 
+// Recent-uploads card. The "+N" chip expands to reveal every detected species
+const RecentCard = ({ file, onView }) => {
+  const [expanded, setExpanded] = useState(false);
+  const tagEntries = Object.entries(file.tagCounts || {});
+  const shown = expanded ? tagEntries : tagEntries.slice(0, 2);
+  return (
+    <div className="home-grid-card" onClick={onView} role="button" tabIndex={0}>
+      <div className="home-grid-card__thumb">
+        {file.thumbnailUrl ? (
+          <img
+            src={file.thumbnailUrl}
+            alt="Wildlife observation"
+            loading="lazy"
+          />
+        ) : (
+          <span className="home-grid-card__video-icon">▶</span>
+        )}
+        <div className="home-grid-card__overlay">View</div>
+      </div>
+      <div className="home-grid-card__tags">
+        {tagEntries.length > 0 ? (
+          <>
+            {shown.map(([tag, count]) => (
+              <span key={tag} className="home-grid-card__tag">
+                {tag}
+                <em>×{count}</em>
+              </span>
+            ))}
+            {tagEntries.length > 2 && (
+              <button
+                type="button"
+                className="home-grid-card__tag home-grid-card__tag--toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded((v) => !v);
+                }}
+              >
+                {expanded ? "show less" : `+${tagEntries.length - 2}`}
+              </button>
+            )}
+          </>
+        ) : (
+          <span className="home-grid-card__tag home-grid-card__tag--none">
+            No species
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const HomePage = () => {
   const navigate = useNavigate();
-  const [recentFiles, setRecentFiles] = useState([]);
+  const [feedFiles, setFeedFiles] = useState([]); // everyone's uploads
+  const [myFiles, setMyFiles] = useState([]); // signed-in user's uploads
+  const [feedScope, setFeedScope] = useState("all"); // 'all' | 'yours'
+  const [showAllObserver, setShowAllObserver] = useState(false);
   const [loading, setLoading] = useState(true);
   const [modalUrl, setModalUrl] = useState(null);
+  const [toast, setToast] = useState(null);
   const [stats, setStats] = useState({
     yourUploads: 0,
     speciesTagged: 0,
@@ -210,7 +278,20 @@ const HomePage = () => {
     activeAlerts: 0,
   });
 
-  // All stats are derived client-side from existing endpoints - no backend work.
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 7000);
+  };
+
+  const openMedia = async (file) => {
+    try {
+      setModalUrl(await getMediaUrl(file.originalUrl));
+    } catch {
+      setModalUrl(file.originalUrl);
+    }
+  };
+
+  // All stats are derived client-side from existing endpoints
   const loadHome = async () => {
     try {
       const [feed, mine, subs] = await Promise.all([
@@ -218,7 +299,8 @@ const HomePage = () => {
         getMyFiles().catch(() => []),
         getSubscriptions().catch(() => null),
       ]);
-      setRecentFiles(feed.slice(0, 8));
+      setFeedFiles(feed);
+      setMyFiles(mine);
       const species = new Set();
       mine.forEach((f) =>
         Object.keys(f.tagCounts || {}).forEach((t) => species.add(t)),
@@ -230,7 +312,8 @@ const HomePage = () => {
         activeAlerts: parseSubscriptions(subs).length,
       });
     } catch {
-      setRecentFiles([]);
+      setFeedFiles([]);
+      setMyFiles([]);
     } finally {
       setLoading(false);
     }
@@ -239,6 +322,16 @@ const HomePage = () => {
   useEffect(() => {
     loadHome();
   }, []);
+
+  // "Observer posts" = other people's uploads only; "Your posts" = your own.
+  const mySub = getUserSub();
+  const observerFiles = feedFiles.filter((f) => f.ownerSub !== mySub);
+  const recentFiles =
+    feedScope === "yours"
+      ? myFiles
+      : showAllObserver
+        ? observerFiles
+        : observerFiles.slice(0, 10);
 
   return (
     <div className="home-page">
@@ -256,7 +349,7 @@ const HomePage = () => {
               library.
             </p>
           </div>
-          <SpeciesAlerts />
+          <SpeciesAlerts onToast={showToast} />
         </div>
 
         {/* Stats */}
@@ -285,14 +378,41 @@ const HomePage = () => {
         <div className="home-recent animate-fade-up">
           <div className="home-recent__header">
             <h2 className="home-recent__title">Recent uploads</h2>
-            {recentFiles.length > 0 && (
-              <button
-                className="home-recent__view-all"
-                onClick={() => navigate("/files")}
-              >
-                View all
-              </button>
-            )}
+            <div className="home-recent__actions">
+              <div className="home-feed-toggle">
+                <button
+                  className={feedScope === "all" ? "active" : ""}
+                  onClick={() => setFeedScope("all")}
+                >
+                  Observer posts
+                </button>
+                <button
+                  className={feedScope === "yours" ? "active" : ""}
+                  onClick={() => setFeedScope("yours")}
+                >
+                  Your posts
+                </button>
+              </div>
+              {feedScope === "yours"
+                ? myFiles.length > 0 && (
+                    <button
+                      className="home-recent__view-all"
+                      onClick={() => navigate("/files")}
+                    >
+                      Edit posts
+                    </button>
+                  )
+                : observerFiles.length > 8 && (
+                    <button
+                      className="home-recent__view-all"
+                      onClick={() => setShowAllObserver((v) => !v)}
+                    >
+                      {showAllObserver
+                        ? "Show less"
+                        : `View all (${observerFiles.length})`}
+                    </button>
+                  )}
+            </div>
           </div>
 
           {loading && (
@@ -319,59 +439,13 @@ const HomePage = () => {
 
           {!loading && recentFiles.length > 0 && (
             <div className="home-grid">
-              {recentFiles.map((file) => {
-                const tagEntries = Object.entries(file.tagCounts || {});
-                return (
-                  <div
-                    key={file.fileId}
-                    className="home-grid-card"
-                    onClick={async () => {
-                      try {
-                        const url = await getMediaUrl(file.originalUrl);
-                        setModalUrl(url);
-                      } catch {
-                        setModalUrl(file.originalUrl);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className="home-grid-card__thumb">
-                      {file.thumbnailUrl ? (
-                        <img
-                          src={file.thumbnailUrl}
-                          alt="Wildlife observation"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <span className="home-grid-card__video-icon">▶</span>
-                      )}
-                      <div className="home-grid-card__overlay">View</div>
-                    </div>
-                    <div className="home-grid-card__tags">
-                      {tagEntries.length > 0 ? (
-                        <>
-                          {tagEntries.slice(0, 2).map(([tag, count]) => (
-                            <span key={tag} className="home-grid-card__tag">
-                              {tag}
-                              <em>×{count}</em>
-                            </span>
-                          ))}
-                          {tagEntries.length > 2 && (
-                            <span className="home-grid-card__tag">
-                              +{tagEntries.length - 2}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="home-grid-card__tag home-grid-card__tag--none">
-                          No species
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {recentFiles.map((file) => (
+                <RecentCard
+                  key={file.fileId}
+                  file={file}
+                  onView={() => openMedia(file)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -379,6 +453,15 @@ const HomePage = () => {
 
       {modalUrl && (
         <ImageModal url={modalUrl} onClose={() => setModalUrl(null)} />
+      )}
+
+      {toast && (
+        <div className="toast animate-fade-up" role="status">
+          {toast}
+          <button className="toast__close" onClick={() => setToast(null)}>
+            ×
+          </button>
+        </div>
       )}
     </div>
   );

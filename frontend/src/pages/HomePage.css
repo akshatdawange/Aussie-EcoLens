@@ -143,7 +143,46 @@
   font-family: var(--font-display);
   font-size: 11px;
   line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.alerts__email {
+  color: var(--accent);
+  font-weight: 700;
+  word-break: break-all;
+}
+
+/* Toast (snackbar) */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(440px, 92vw);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-glow);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  padding: 14px 18px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.toast__close {
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
   color: var(--text-muted);
+  transition: color 0.2s;
+}
+.toast__close:hover {
+  color: var(--text-primary);
 }
 
 .alerts__input-row { display: flex; gap: 8px; }
@@ -315,6 +354,40 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.home-recent__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Your posts / Observer posts toggle */
+.home-feed-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+.home-feed-toggle button {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.home-feed-toggle button:hover {
+  color: var(--text-secondary);
+}
+.home-feed-toggle button.active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .home-recent__title {
@@ -490,6 +563,15 @@
   font-style: italic;
   font-weight: 500;
   text-transform: none;
+}
+
+.home-grid-card__tag--toggle {
+  cursor: pointer;
+  border: none;
+  color: var(--accent);
+}
+.home-grid-card__tag--toggle:hover {
+  background: var(--accent-dim);
 }
 
 @media (max-width: 768px) {

@@ -145,7 +145,7 @@ const LandingPage = () => {
           ConfirmationCode: verifyCode.trim(),
         }),
       );
-      // Verified — switch to sign in
+      // Verified - switch to sign in
       setVerifyMode(false);
       setMode("signin");
       setSignInForm({ email: verifyEmail, password: "" });
@@ -181,7 +181,7 @@ const LandingPage = () => {
       <div className="landing__orb" ref={orbRef} />
 
       <div className="landing__layout">
-        {/* Left — Hero */}
+        {/* Left - Hero */}
         <div className="landing__left">
           <div className="landing__hero-content stagger">
             <div className="landing__badge animate-fade-up">
@@ -201,20 +201,6 @@ const LandingPage = () => {
               Upload wildlife media and let our AI instantly identify, tag, and
               organise every species across Australia.
             </p>
-
-            {/* <div className="landing__features-list animate-fade-up">
-              {[
-                'Auto species detection on upload',
-                'Search by animal, count, or photo',
-                'Email alerts for new sightings',
-                'Multi-cloud AWS + GCP infrastructure',
-              ].map(f => (
-                <div key={f} className="landing__feature-item">
-                  <span className="landing__feature-check">✓</span>
-                  {f}
-                </div>
-              ))}
-            </div> */}
           </div>
 
           {/* Floating species tags */}

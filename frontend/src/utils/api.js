@@ -11,6 +11,18 @@ const getHeaders = (isJson = true) => {
   return headers;
 };
 
+// fetch wrapper: on a 401 (expired/invalid token) clear the session and bounce
+// the user back to the sign-in page, instead of leaving them stuck on errors.
+const authFetch = async (url, opts) => {
+  const res = await fetch(url, opts);
+  if (res.status === 401) {
+    sessionStorage.clear();
+    if (window.location.pathname !== "/") window.location.href = "/";
+    throw new Error("Session expired - please sign in again.");
+  }
+  return res;
+};
+
 // Decode the Cognito ID token (JWT) payload without verifying the signature.
 const decodeToken = () => {
   const t = getRawToken();
@@ -98,7 +110,7 @@ export const uploadFile = async (file) => {
   const fileType = file.type.startsWith("video") ? "video" : "image";
 
   // Step 1 - get presigned URL
-  const presignRes = await fetch(`${UPLOAD_BASE}/uploads/presign`, {
+  const presignRes = await authFetch(`${UPLOAD_BASE}/uploads/presign`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -121,7 +133,7 @@ export const uploadFile = async (file) => {
   // Duplicate file
   if (data.duplicate) return { duplicate: true, fileId: data.fileId };
 
-  // Step 2 - PUT directly to S3
+  // Step 2 - PUT directly to S3 (not our API; don't treat its errors as auth)
   const s3Res = await fetch(data.uploadUrl, {
     method: "PUT",
     headers: { "Content-Type": file.type },
@@ -138,7 +150,7 @@ export const getMediaUrl = async (originalUrl) => {
   const key = decodeURIComponent(
     new URL(originalUrl).pathname.replace(/^\//, ""),
   );
-  const res = await fetch(
+  const res = await authFetch(
     `${UPLOAD_BASE}/media-url?key=${encodeURIComponent(key)}`,
     {
       headers: { Authorization: getRawToken() }, // raw token, no Bearer
@@ -154,7 +166,7 @@ export const getMediaUrl = async (originalUrl) => {
 // if that isn't supported it falls back to the feed and filters client-side by
 // the owner identifier embedded in each record (so no other user's files leak).
 const fetchFiles = async (scope) => {
-  const res = await fetch(`${BASE}/files?scope=${scope}`, {
+  const res = await authFetch(`${BASE}/files?scope=${scope}`, {
     headers: getHeaders(false),
   });
   if (!res.ok) throw new Error(`Failed to fetch files (${res.status})`);
@@ -209,7 +221,7 @@ export const getFeed = async () => {
 
 export const getFileByThumbnail = async (thumbnailUrl) => {
   const params = new URLSearchParams({ thumbnailUrl });
-  const res = await fetch(`${BASE}/files/by-thumbnail?${params}`, {
+  const res = await authFetch(`${BASE}/files/by-thumbnail?${params}`, {
     headers: getHeaders(false),
   });
   if (!res.ok) throw new Error("Failed to fetch by thumbnail");
@@ -218,7 +230,7 @@ export const getFileByThumbnail = async (thumbnailUrl) => {
 
 // Search
 export const searchBySpecies = async (speciesArray) => {
-  const res = await fetch(`${BASE}/search/species`, {
+  const res = await authFetch(`${BASE}/search/species`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({ species: speciesArray }),
@@ -228,7 +240,7 @@ export const searchBySpecies = async (speciesArray) => {
 };
 
 export const searchByTagCounts = async (tagCountObj) => {
-  const res = await fetch(`${BASE}/search/tag-counts`, {
+  const res = await authFetch(`${BASE}/search/tag-counts`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify(tagCountObj),
@@ -244,7 +256,7 @@ export const searchByImage = async (file) => {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-  const res = await fetch(`${BASE}/search/by-image`, {
+  const res = await authFetch(`${BASE}/search/by-image`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({ imageBase64: base64, contentType: file.type }),
@@ -255,7 +267,7 @@ export const searchByImage = async (file) => {
 
 // Tags
 export const bulkUpdateTags = async (fileIds, tags, operation) => {
-  const res = await fetch(`${BASE}/tags/bulk`, {
+  const res = await authFetch(`${BASE}/tags/bulk`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({ op: operation, files: fileIds, tags }),
@@ -266,7 +278,7 @@ export const bulkUpdateTags = async (fileIds, tags, operation) => {
 
 // Delete
 export const deleteFiles = async (fileIds) => {
-  const res = await fetch(`${BASE}/files`, {
+  const res = await authFetch(`${BASE}/files`, {
     method: "DELETE",
     headers: getHeaders(),
     body: JSON.stringify({ files: fileIds }),
@@ -277,7 +289,7 @@ export const deleteFiles = async (fileIds) => {
 
 // Subscriptions
 export const getSubscriptions = async () => {
-  const res = await fetch(`${BASE}/subscriptions`, {
+  const res = await authFetch(`${BASE}/subscriptions`, {
     headers: getHeaders(false),
   });
   if (!res.ok) throw new Error("Failed to get subscriptions");
@@ -285,7 +297,7 @@ export const getSubscriptions = async () => {
 };
 
 export const createSubscription = async (email, species) => {
-  const res = await fetch(`${BASE}/subscriptions`, {
+  const res = await authFetch(`${BASE}/subscriptions`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({ email, species }),
@@ -295,7 +307,7 @@ export const createSubscription = async (email, species) => {
 };
 
 export const deleteSubscription = async () => {
-  const res = await fetch(`${BASE}/subscriptions`, {
+  const res = await authFetch(`${BASE}/subscriptions`, {
     method: "DELETE",
     headers: getHeaders(false),
   });

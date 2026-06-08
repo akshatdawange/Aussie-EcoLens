@@ -8,11 +8,18 @@ const ImageModal = ({ url, onClose }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Detect videos by extension (handles presigned URLs with a query string).
+  const isVideo = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(url);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>×</button>
-        <img src={url} alt="Full size" className="modal-img" />
+        {isVideo ? (
+          <video src={url} className="modal-img" controls autoPlay />
+        ) : (
+          <img src={url} alt="Full size" className="modal-img" />
+        )}
         <a
           href={url}
           target="_blank"
@@ -20,7 +27,7 @@ const ImageModal = ({ url, onClose }) => {
           className="modal-link"
           onClick={e => e.stopPropagation()}
         >
-          Open original ↗
+          Open original
         </a>
       </div>
     </div>
