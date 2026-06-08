@@ -1,33 +1,57 @@
-# Model files (too big for Git — uploaded to GCS instead)
+# ===== Secrets / credentials - NEVER commit these =====
+.env
+.env.*
+*.pem
+*.key
+service-account*.json
+**/credentials
+aws-credentials*
+secrets.json
+
+# ===== Local-only notes (contain account ID) =====
+PART-B-CHECKLIST.md
+
+# ===== ML model files (too big for Git - uploaded to GCS instead) =====
 *.pt
 *.onnx
 *.h5
 models/
 
-# Test fixtures (large; not committed)
+# ===== Test fixtures (large; not committed) =====
 test_images/
 
-# Python
+# ===== SAM / build artifacts =====
+.aws-sam/
+packaged.yaml
+*.zip
+
+# ===== Python =====
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-venv/
+*.egg-info/
 .venv/
+venv/
 env/
+.pytest_cache/
 
-# macOS
-.DS_Store
+# ===== Node (frontend) =====
+node_modules/
+dist/
+.vite/
+*.local
 
-# IDE
+# ===== IDE =====
 .vscode/settings.json
 .idea/
 
-# Secrets
-.env
-*.key
-service-account*.json
+# ===== OS / editor junk =====
+.DS_Store
+Thumbs.db
+*.swp
+*~
 
-# Outputs
+# ===== Outputs =====
 mg_detections.json
 cropped_images/
 *.log

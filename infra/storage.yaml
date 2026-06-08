@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: EcoLens Part B - Storage (3 S3 buckets + dedup table) and shared SSM config
+
+Resources:
+
+  # ---- The 3 storage buckets ----
+  OriginalsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "ecolens-originals-${AWS::AccountId}"
+
+  ThumbnailsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "ecolens-thumbnails-${AWS::AccountId}"
+
+  FramesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "ecolens-frames-${AWS::AccountId}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteFramesAfter7Days
+            Status: Enabled
+            ExpirationInDays: 7          # video frames are throwaway -> auto-delete (cost rule)
+
+  # ---- Deduplication table (Member B owns) ----
+  HashesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: EcoLensHashes
+      BillingMode: PAY_PER_REQUEST       # on-demand = ~$0 at our scale (cost rule)
+      AttributeDefinitions:
+        - AttributeName: sha256
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sha256
+          KeyType: HASH
+
+  # ---- Publish names to SSM so teammates never hard-code them ----
+  ParamOriginals:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /ecolens/buckets/originals
+      Type: String
+      Value: !Ref OriginalsBucket
+  ParamThumbnails:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /ecolens/buckets/thumbnails
+      Type: String
+      Value: !Ref ThumbnailsBucket
+  ParamFrames:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /ecolens/buckets/frames
+      Type: String
+      Value: !Ref FramesBucket
+  ParamHashesTable:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /ecolens/tables/hashes
+      Type: String
+      Value: !Ref HashesTable
+
+Outputs:
+  OriginalsBucket:
+    Value: !Ref OriginalsBucket
+  ThumbnailsBucket:
+    Value: !Ref ThumbnailsBucket
+  FramesBucket:
+    Value: !Ref FramesBucket
+  HashesTable:
+    Value: !Ref HashesTable
