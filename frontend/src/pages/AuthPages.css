@@ -1,0 +1,115 @@
+/* Centered single-card layout */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.auth-card--slim {
+  max-width: 400px;
+}
+
+.auth-logo {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
+  margin-bottom: 36px;
+  text-align: left;
+  transition: color 0.2s;
+}
+.auth-logo:hover { color: var(--text-primary); }
+
+/* Header */
+.auth-card__header { margin-bottom: 28px; }
+
+.auth-card__title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
+.auth-card__subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-family: var(--font-display);  
+}
+
+/* Body */
+.auth-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Note */
+.auth-card__note {
+  margin-top: 28px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  letter-spacing: 0.04em;
+  font-family: var(--font-display);
+}
+
+/* Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--font-display) !important;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-dim);
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .auth-card { padding: 36px 24px; }
+}
+
+.auth-name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.auth-error {
+  font-size: 12px;
+  color: var(--error);
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-family: var(--font-display);
+}
