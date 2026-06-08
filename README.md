@@ -46,10 +46,11 @@ Parameter Store for service discovery.
   (API Gateway -> Lambda), which computes a SHA-256 checksum and checks the
   `EcoLensHashes` DynamoDB table to prevent duplicate uploads, then returns a
   short-lived S3 presigned URL. The browser uploads directly to the
-  `ecolens-originals` bucket. The resulting `ObjectCreated` event triggers two
-  Lambdas in parallel: a **thumbnail Lambda** (OpenCV) that resizes the image
-  preserving aspect ratio and writes to `ecolens-thumbnails`, and an
-  **orchestrator Lambda** that performs ML tagging.
+  `ecolens-originals` bucket. The resulting `ObjectCreated` event automatically
+  triggers the **orchestrator Lambda**, which fans the event out (async invoke)
+  to a **thumbnail Lambda** (OpenCV) that resizes the image preserving aspect
+  ratio and writes to `ecolens-thumbnails` and, for videos, a **frame-extract
+  Lambda** - then performs the ML tagging itself.
 
 - **ML inference (secondary cloud).** The orchestrator sends the image to the
   **GCP Cloud Run** service (`/infer`), authenticating across clouds with a
@@ -142,21 +143,26 @@ Browser  ------------------------->  API Gateway -> get_upload_url Lambda
    v
 S3: ecolens-originals
    |
-   | (3) ObjectCreated event (parallel)
-   +-------------------------------+----------------------------+
-   v                               v                            v
-thumbnail Lambda (OpenCV)     orchestrator Lambda         frame_extract Lambda
-   |                               |  (4) POST /infer           |  (video, 1 fps)
-   v                               v   + shared secret          v
-S3: ecolens-thumbnails        GCP Cloud Run -----------> per-frame inference
-                                   |  MegaDetector + SpeciesNet
-                                   | (5) write tags + counts
-                                   v
-                              DynamoDB: EcoLensMain
-                                   |
-                                   | (6) publish matching species
-                                   v
-                              SNS -> email subscribers
+   | (3) ObjectCreated event
+   v
+orchestrator Lambda
+   |  fans out (async invoke)
+   +-----------------------------+----------------------------+
+   |                             v                            v
+   |                    thumbnail Lambda (OpenCV)     frame_extract Lambda
+   |                             |                            |  (video, 1 fps)
+   | (4) POST /infer            v                            v
+   |     + shared secret  S3: ecolens-thumbnails       per-frame inference
+   v                                                         |
+GCP Cloud Run  <-----------------------------------------------+
+   |  MegaDetector + SpeciesNet
+   | (5) tags + counts returned; orchestrator writes them
+   v
+DynamoDB: EcoLensMain
+   |
+   | (6) publish matching species
+   v
+SNS -> email subscribers
 
 Search / manage:  Browser -> API Gateway -> query Lambdas -> EcoLensMain
 ```
