@@ -1,0 +1,220 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: EcoLens API stack - API Gateway and Lambda functions
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30
+    MemorySize: 256
+    CodeUri: ../services/api/
+    Environment:
+      Variables:
+        TABLE_NAME: EcoLensMain
+        HASHES_TABLE_NAME: EcoLensHashes
+        SNS_TOPIC_ARN: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:EcoLensTagsTopic
+    Tags:
+      Project: EcoLens
+
+Resources:
+  EcoLensHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+
+  FilesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EcoLensFilesFunction
+      Handler: files.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: EcoLensMain
+      Events:
+        GetFiles:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /files
+            Method: GET
+        GetFileById:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /files/{fileId}
+            Method: GET
+
+  SearchSpeciesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EcoLensSearchSpeciesFunction
+      Handler: search_species.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: EcoLensMain
+      Events:
+        SearchSpecies:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /search/species
+            Method: POST
+
+  SearchTagCountsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EcoLensSearchTagCountsFunction
+      Handler: search_tag_counts.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: EcoLensMain
+      Events:
+        SearchTagCounts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /search/tag-counts
+            Method: POST
+
+  SearchThumbnailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EcoLensSearchThumbnailFunction
+      Handler: search_thumbnail.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: EcoLensMain
+      Events:
+        SearchThumbnail:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /files/by-thumbnail
+            Method: GET
+
+  SearchByImageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EcoLensSearchByImageFunction
+      Handler: search_by_image.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: EcoLensMain
+        - Statement:
+            Effect: Allow
+            Action:
+              - ssm:GetParameter
+            Resource:
+              - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/inferUrl
+              - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ecolens/gcp/sharedSecret
+      Events:
+        SearchByImage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /search/by-image
+            Method: POST
+
+  TagsBulkFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EcoLensTagsBulkFunction
+      Handler: tags_bulk.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: EcoLensMain
+      Events:
+        TagsBulk:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /tags/bulk
+            Method: POST
+
+  DeleteFilesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EcoLensDeleteFilesFunction
+      Handler: delete_files.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: EcoLensMain
+        - Statement:
+            Effect: Allow
+            Action:
+              - dynamodb:Scan
+              - dynamodb:DeleteItem
+            Resource:
+              - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/EcoLensHashes
+        - Statement:
+            Effect: Allow
+            Action:
+              - s3:DeleteObject
+            Resource:
+              - !Sub arn:aws:s3:::ecolens-originals-${AWS::AccountId}/*
+              - !Sub arn:aws:s3:::ecolens-thumbnails-${AWS::AccountId}/*
+              - !Sub arn:aws:s3:::ecolens-frames-${AWS::AccountId}/*
+      Events:
+        DeleteFiles:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /files
+            Method: DELETE
+
+  SubscriptionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EcoLensSubscriptionsFunction
+      Handler: subscriptions.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: EcoLensMain
+        - Statement:
+            Effect: Allow
+            Action:
+              - sns:Subscribe
+              - sns:Unsubscribe
+              - sns:GetSubscriptionAttributes
+              - sns:SetSubscriptionAttributes
+            Resource:
+              - !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:EcoLensTagsTopic
+      Events:
+        GetSubscriptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /subscriptions
+            Method: GET
+        PostSubscriptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /subscriptions
+            Method: POST
+        DeleteSubscriptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EcoLensHttpApi
+            Path: /subscriptions
+            Method: DELETE
+
+Outputs:
+  EcoLensApiUrl:
+    Description: Base URL for EcoLens API
+    Value: !Sub https://${EcoLensHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+
+  EcoLensApiId:
+    Description: API Gateway HTTP API ID
+    Value: !Ref EcoLensHttpApi
